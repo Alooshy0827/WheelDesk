@@ -1,8 +1,8 @@
 import { Button, Dropdown, FluentProvider, Input, Option, Textarea, webDarkTheme, webLightTheme, motionTokens } from '@fluentui/react-components';
-import { Add24Regular, Apps24Regular, ArrowMove24Regular, ArrowSync24Regular, Copy24Regular, Cursor24Regular, DataPie24Regular, Delete24Regular, Info24Regular, LocalLanguage24Regular, Play24Regular, Power24Regular, Rocket24Regular, Settings24Regular, ShieldKeyhole24Regular, Sparkle24Regular } from '@fluentui/react-icons';
+import { Add24Regular, Apps24Regular, ArrowMove24Regular, ArrowSync24Regular, Copy24Regular, Cursor24Regular, DataPie24Regular, Delete24Regular, Info24Regular, LocalLanguage24Regular, Play24Regular, Power24Regular, Rocket24Regular, Settings24Regular, ShieldKeyhole24Regular, Sparkle24Regular, ResizeLarge24Regular, Timer24Regular, Speaker224Regular, SpeakerMute24Regular, MusicNote224Regular } from '@fluentui/react-icons';
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import type { DeskCommand, DeskReply, DeskState } from '../../shared/ipc';
-import { ACTION_KINDS, INPUT_SOURCES, defaultWorkbench, newAction, validateWorkflow, type ActionDefinition, type ActionKind, type InputSource, type WorkbenchSettings } from '../../shared/actions';
+import { ACTION_KINDS, INPUT_SOURCES, defaultWorkbench, newAction, setWheelEffects, validateWorkflow, type ActionDefinition, type ActionKind, type InputSource, type WorkbenchSettings } from '../../shared/actions';
 import { keyboardTriggers, triggerLabel, type Settings, type TriggerKey } from '../../shared/settings';
 import { deskError, deskText, strings } from '../../shared/i18n';
 import { ExpanderRow, OnOffSwitch, SettingRow, SliderRow, SwitchRow } from '../settings/components/rows';
@@ -12,6 +12,7 @@ import { TextContext } from '../settings/text';
 import { macDarkTheme, macLightTheme } from '../settings/macTheme';
 import { barFrames } from '../settings/navIndicator';
 import { icons } from './Wheel';
+import { ALL_PINGS, DEFAULT_WHEEL, FALLBACK_TEXTURE, textureUrl } from '../../shared/pings';
 import '../settings/settings.css';
 import '../settings/mac.css';
 import './settings-additions.css';
@@ -138,13 +139,31 @@ export function SettingsApp() {
         <SliderRow icon={<ArrowMove24Regular/>} limit="dragThresholdPx" title={upstream.dragDistance} description={upstream.dragDistanceDesc} value={draft.dragThresholdPx} format={v => `${v} ${state.platform === 'mac' ? 'pt' : 'px'}`} onChange={v => changeSettings({ dragThresholdPx: v })} dim={off}/>
         <SwitchRow icon={<Power24Regular/>} title={t.enabled} checked={draft.enabledOnStart} onChange={v => changeSettings({ enabledOnStart: v })}/>
         <div className="section" id="wheels">{t.wheels}</div>
-        <SettingRow icon={<DataPie24Regular/>} title={t.wheels} description={t.wheelSlotsHelp}><Choice label={t.wheels} value={wheel.id} options={wb.wheels.map(w => ({ id: w.id, name: name(w) }))} onChange={setWheelId}/><Button icon={<Add24Regular/>} aria-label={t.newWheel} onClick={() => { const id = uid(); edit({ wheels: [...wb.wheels, { id, name: t.newWheel, nameEn: t.newWheel, slots: Array(8).fill(null) }] }); setWheelId(id); }}/></SettingRow>
+        <SettingRow icon={<DataPie24Regular/>} title={t.wheels} description={t.wheelSlotsHelp}><Choice label={t.wheels} value={wheel.id} options={wb.wheels.map(w => ({ id: w.id, name: name(w) }))} onChange={setWheelId}/><Button icon={<Add24Regular/>} aria-label={t.newWheel} onClick={() => { const id = uid(); edit({ wheels: [...wb.wheels, { id, name: t.newWheel, nameEn: t.newWheel, slots: Array(8).fill(null), effects: [...DEFAULT_WHEEL] }] }); setWheelId(id); }}/></SettingRow>
         <ExpanderRow icon={<Settings24Regular/>} title={name(wheel)} control={<div className="wdButtons"><Button icon={<Copy24Regular/>} onClick={() => { const id = uid(); edit({ wheels: [...wb.wheels, { ...structuredClone(wheel), id, name: wheel.name + ' 2', nameEn: wheel.nameEn + ' 2' }] }); setWheelId(id); }}>{t.duplicate}</Button><Button icon={<Delete24Regular/>} disabled={wb.wheels.length <= 1} onClick={() => remove(() => { edit({ wheels: wb.wheels.filter(w => w.id !== wheel.id) }); setWheelId(''); })}>{t.remove}</Button><Button appearance="primary" disabled={wb.activeWheelId === wheel.id} onClick={() => edit({ activeWheelId: wheel.id })}>{wb.activeWheelId === wheel.id ? t.active : t.activate}</Button></div>}><div className="expPane"><div className="mateFields"><span>{t.name}</span><DraftInput key={wheel.id + 'name'} value={wheel.name} maxLength={80} onSave={v => edit({ wheels: wb.wheels.map(w => w.id === wheel.id ? { ...w, name: v } : w) })}/><span>{t.nameEn}</span><DraftInput key={wheel.id + 'en'} value={wheel.nameEn} maxLength={80} onSave={v => edit({ wheels: wb.wheels.map(w => w.id === wheel.id ? { ...w, nameEn: v } : w) })}/></div></div></ExpanderRow>
-        <WheelEditor key={wheel.id} wheel={wheel.slots.map(id => id ?? '')} center="" centerOn={false} centerEditable={false} centerLabel={t.cancel} emptyId="" trigger={triggerLabel(draft.trigger, state.lang, state.platform)}
-          pool={[{ id: '', name: t.empty, icon: iconUrl('empty') }, ...wb.actions.map(a => ({ id: a.id, name: name(a), icon: iconUrl(a.kind) }))]}
-          defaults={{ wheel: defaultWorkbench().wheels.find(w => w.id === wheel.id)?.slots.map(id => id ?? '') ?? Array(8).fill(''), center: '' }}
-          labels={{ title: t.wheelPreview, desc: t.wheelSlotsHelp, poolTitle: t.actions, poolDesc: t.wheelPoolHelp }}
-          onChange={p => { if (p.wheel) edit({ wheels: wb.wheels.map(w => w.id === wheel.id ? { ...w, slots: p.wheel?.map(id => id || null) ?? w.slots } : w) }); }} onPreview={() => undefined}/>
+        <WheelEditor key={wheel.id} wheel={wheel.effects} center="generic" centerOn={false} centerEditable={false} centerLabel={t.cancel} trigger={triggerLabel(draft.trigger, state.lang, state.platform)}
+          pool={ALL_PINGS.map(p => ({ id: p.id, name: upstream.pingNames[p.id], icon: textureUrl(p.icon) }))}
+          defaults={{ wheel: DEFAULT_WHEEL, center: 'generic' }}
+          labels={{ title: t.wheelPreview, desc: t.effectBindingHelp, poolTitle: t.originalEffects, poolDesc: t.effectPoolHelp }}
+          onChange={p => { if (p.wheel) edit({ wheels: wb.wheels.map(w => w.id === wheel.id ? setWheelEffects(w, p.wheel ?? w.effects) : w) }); }}
+          onPreview={effect => { void flush().then(ok => { if (ok) void invoke({ type: 'previewEffect', effect }); }); }}/>
+        <div className="card mate wdBindings"><div className="mateHead"><b>{t.bindActions}</b></div><span className="desc">{t.effectBindingHelp}</span>
+          {wheel.effects.map((effect, i) => <div className="wdBinding" key={i}>
+            <img src={textureUrl(ALL_PINGS.find(p => p.id === effect)?.icon ?? FALLBACK_TEXTURE)} alt=""/>
+            <div><b>{upstream.slotNames[i]}</b><span className="desc">{upstream.pingNames[effect]}</span></div>
+            <Choice label={`${upstream.slotNames[i]} · ${t.action}`} value={wheel.slots[i] ?? ''}
+              options={[{ id: '', name: t.empty }, ...wb.actions.map(a => ({ id: a.id, name: name(a) }))]}
+              onChange={id => edit({ wheels: wb.wheels.map(w => w.id === wheel.id ? { ...w, slots: w.slots.map((v, j) => i === j ? id || null : v) } : w) })}/>
+          </div>)}
+        </div>
+        <ExpanderRow icon={<Settings24Regular/>} title={t.effectSettings}>
+          <SliderRow icon={<ResizeLarge24Regular/>} limit="wheelSizePx" title={upstream.wheelSize} value={draft.wheelSizePx} format={v => `${v} ${state.platform === 'mac' ? 'pt' : 'px'}`} onChange={wheelSizePx => changeSettings({ wheelSizePx })}/>
+          <SliderRow icon={<ResizeLarge24Regular/>} limit="pingSizePx" title={t.effectSize} value={draft.pingSizePx} format={v => `${v} ${state.platform === 'mac' ? 'pt' : 'px'}`} onChange={pingSizePx => changeSettings({ pingSizePx })}/>
+          <SliderRow icon={<Timer24Regular/>} limit="pingDurationS" title={t.effectDuration} value={draft.pingDurationS} format={v => `${v.toFixed(1)} s`} onChange={pingDurationS => changeSettings({ pingDurationS })}/>
+          <SliderRow icon={<Speaker224Regular/>} limit="volume" title={upstream.volume} value={draft.volume} format={String} onChange={volume => changeSettings({ volume })} dim={draft.muted}/>
+          <SwitchRow icon={<SpeakerMute24Regular/>} title={upstream.mute} checked={draft.muted} onChange={muted => changeSettings({ muted })}/>
+          <SwitchRow icon={<MusicNote224Regular/>} title={upstream.tickSound} checked={draft.tickSound} onChange={tickSound => changeSettings({ tickSound })}/>
+        </ExpanderRow>
         <div className="section" id="actions">{t.actions}</div>
         <SettingRow icon={<Apps24Regular/>} title={t.actions} description={t.testHint}><Choice label={t.actions} value={action?.id ?? ''} options={wb.actions.map(a => ({ id: a.id, name: name(a) }))} onChange={setActionId}/><Button icon={<Add24Regular/>} aria-label={t.newAction} onClick={() => { const id = uid(); edit({ actions: [...wb.actions, { ...newAction(id, 'ai'), name: t.newAction, nameEn: t.newAction }] }); setActionId(id); }}/></SettingRow>
         {action && <div className="card mate wdEditor" key={action.id}><div className="mateHead"><b>{name(action)}</b><Button icon={<Play24Regular/>} onClick={() => void run(action.id)}>{t.test}</Button><Button icon={<Delete24Regular/>} onClick={() => remove(() => edit({ actions: wb.actions.filter(a => a.id !== action.id) }))}>{t.remove}</Button></div>

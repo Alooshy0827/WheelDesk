@@ -350,15 +350,22 @@ export type DeskCommand =
   | { type: 'check'; id: string }
   | { type: 'input'; text?: string; clipboard?: boolean }
   | { type: 'capture'; rect: { x: number; y: number; w: number; h: number } | null }
+  | { type: 'overlayIdle'; idle: boolean }
+  | { type: 'previewEffect'; effect: string }
   | { type: 'copy' | 'paste' | 'close' | 'retry' | 'accessibility' | 'screenPermission' | 'data' };
 export interface DeskReply { ok: boolean; error?: string; models?: string[]; state?: DeskState }
 export interface DeskOverlay {
-  type: 'open' | 'move' | 'close' | 'capture';
+  type: 'open' | 'move' | 'close' | 'capture' | 'effect';
   x?: number; y?: number;
   labels?: string[];
   kinds?: string[];
   name?: string;
   lang?: Lang;
+  effects?: import('./pings').PingId[];
+  effect?: import('./pings').PingId;
+  enabled?: boolean[];
+  clear?: boolean;
+  visual?: Pick<Settings, 'wheelSizePx' | 'pingSizePx' | 'pingDurationS' | 'volume' | 'muted' | 'tickSound'>;
 }
 export interface DeskApi {
   invoke(command: DeskCommand): Promise<DeskReply>;

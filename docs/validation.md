@@ -1,21 +1,22 @@
 # Validation / 验证记录
 
-Version: 0.1.0 internal beta. Host: Apple Silicon, macOS 26.6. Target: macOS 13+ Apple Silicon. Windows installer is deferred by request.
+Version: 0.1.1 internal beta. Host: Apple Silicon, macOS 26.6. Target: macOS 13+ Apple Silicon. Windows installer is deferred by request.
 
 ## Automated checks
 
 - `npm run typecheck`: passed.
 - `npm run test:helper`: 692 input assertions, 544 context assertions, 26 macOS callback assertions; all passed (1,262 total). The context tests include shortcut validation, held modifiers, target changes and elevated targets.
-- `npm test`: 132 files passed; 2,062 tests passed, 5 skipped. Includes upstream regressions, configuration repair, workflow sequencing/failure/cancel/snapshots, actual scripts, provider fixtures and credential boundaries.
+- `npm test`: 134 files passed; 2,077 tests passed, 5 skipped. Includes original-effect migration, moving effect/function pairs, gesture snapshots, one-shot dispatch, preview isolation, scaled hit testing, capture cleanup, local asset-origin boundaries, upstream regressions, configuration repair, workflow sequencing/failure/cancel/snapshots, actual scripts, provider fixtures and credential boundaries.
 - `npm run build`: passed.
+- The first full test run, concurrent with the native compiler, hit the upstream PDF test’s 5-second timeout. A full rerun without that contention passed unchanged.
 
-- GitHub Actions: [initial cross-platform check](https://github.com/Alooshy0827/WheelDesk/actions/runs/43441701375) passed on both native platforms.
+- Prior GitHub Actions: [initial cross-platform check](https://github.com/Alooshy0827/WheelDesk/actions/runs/43441701375) passed on both native platforms.
 
 ## Desktop validation
 
 `tools/smoke.cjs` launches the real Electron application against a disposable configuration directory and local mock model server. The settings renderer now directly reuses the upstream settings styles, platform themes, grouped rows, Fluent controls and wheel editor; the new action/workflow/model configuration lives inside that interface.
 
-Checks include settings rendering, Chinese text, section navigation, light/dark themes, wheel slot editing and persistence, model listing, streamed text-only AI responses, usage, rejecting privileged operations from the result renderer, and a real local script action. It does not send data to an external model service.
+Checks include settings rendering, Chinese text, section navigation, light/dark themes, effect/function pair editing and persistence, empty function slots, all 12 original effects, All In’s collision/rings/flash, original 1.18× hover scaling and 120 ms transition, custom function labels, independent effect preview, idle overlay cleanup, all 12 WAV files fetched and decoded from the production app origin, model listing, streamed text-only AI responses, usage, rejecting privileged operations from the result renderer, and a real local script action. It does not send data to an external model service.
 
 ## macOS installer checks
 
@@ -23,8 +24,8 @@ Checks include settings rendering, Chinese text, section navigation, light/dark 
 - DMG mounts read-only with WheelDesk.app and the Applications shortcut.
 - `codesign --verify --deep --strict` passed for the ad-hoc-signed app.
 - Both bundled native helpers are ARM64; app identifier is `app.wheeldesk.desktop`, minimum macOS is 13.0.
-- Packaged JavaScript matches the checked production build. LICENSE and NOTICE.md are present; no game media, credentials or node_modules are bundled.
-- The app was copied from the image to an isolated installation test directory and launched. A first-run keychain initialization issue was fixed. The installed application now displays the original-style settings page successfully, confirmed through its native accessibility tree and screenshot.
+- Packaged JavaScript matches the checked production build. LICENSE and NOTICE.md are present; the 15 original textures and 12 WAV sounds are present with attribution; no credentials or node_modules are bundled.
+- The 0.1.1 app was copied from the DMG to an isolated installation directory and launched. Its native accessibility tree and screenshot confirm the production wheeldesk://app origin, version, original wheel textures/palette and custom-function bindings.
 
 ## Not yet accepted on real systems
 

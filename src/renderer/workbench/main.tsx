@@ -5,7 +5,8 @@ import { ACTION_KINDS, INPUT_SOURCES, newAction, validateWorkflow, type ActionDe
   type InputSource, type WorkbenchSettings, type WorkflowDefinition } from '../../shared/actions';
 import type { Settings, TriggerKey } from '../../shared/settings';
 import { deskText, deskError } from '../../shared/i18n';
-import { Icon, Wheel, hotAt } from './Wheel';
+import { Icon } from './Wheel';
+import { Overlay } from './Overlay';
 import { SettingsApp } from './Settings';
 import './style.css';
 declare global { interface Window { desk: DeskApi } }
@@ -13,31 +14,6 @@ const uid = () => crypto.randomUUID();
 const initialRole = location.hash.slice(1) || 'settings';
 function Field({ label, children, hint }: { label: string; children: ReactNode; hint?: string }) {
   return <label className="field"><span>{label}</span>{children}{hint && <small>{hint}</small>}</label>;
-}
-function Overlay() {
-  const [event, setEvent] = useState<DeskOverlay>({ type: 'close' });
-  const origin = useRef({ x: 0, y: 0 });
-  const [hot, setHot] = useState(-1);
-  const [rect, setRect] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
-  const drag = useRef<{ x: number; y: number } | null>(null);
-  useEffect(() => window.desk.onOverlay(e => {
-    if (e.type === 'move') setHot(hotAt((e.x ?? 0) - origin.current.x, (e.y ?? 0) - origin.current.y));
-    else { setEvent(e); setHot(-1); setRect(null); drag.current = null;
-      if (e.type === 'open') origin.current = { x: e.x ?? 0, y: e.y ?? 0 }; }
-  }), []);
-  useEffect(() => {
-    const key = (e: KeyboardEvent) => { if (e.key === 'Escape' && event.type === 'capture') void window.desk.invoke({ type: 'capture', rect: null }); };
-    window.addEventListener('keydown', key); return () => window.removeEventListener('keydown', key);
-  }, [event.type]);
-  if (event.type === 'close') return null;
-  if (event.type === 'capture') return <div className="capture" onContextMenu={e => { e.preventDefault(); void window.desk.invoke({ type: 'capture', rect: null }); }}
-    onPointerDown={e => { if (e.button !== 0) return; drag.current = { x: e.clientX, y: e.clientY }; e.currentTarget.setPointerCapture(e.pointerId); }}
-    onPointerMove={e => { const a = drag.current; if (a) setRect({ x: Math.min(a.x, e.clientX), y: Math.min(a.y, e.clientY), w: Math.abs(a.x - e.clientX), h: Math.abs(a.y - e.clientY) }); }}
-    onPointerUp={() => { if (rect && rect.w >= 3 && rect.h >= 3) void window.desk.invoke({ type: 'capture', rect }); drag.current = null; }}>
-    <div className="capture-hint">{deskText(event.lang ?? 'en').captureHint}</div>
-    {rect && <div className="capture-rect" style={{ left: rect.x, top: rect.y, width: rect.w, height: rect.h }}/>}</div>;
-  return <div className="floating-wheel" style={{ left: (event.x ?? 0) - 180, top: (event.y ?? 0) - 180 }}>
-    <Wheel labels={event.labels ?? []} kinds={event.kinds ?? []} name={event.name ?? ''} hot={hot}/></div>;
 }
 function App() {
   const [state, setState] = useState<DeskState | null>(null);

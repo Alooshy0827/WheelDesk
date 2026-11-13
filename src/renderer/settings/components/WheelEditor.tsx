@@ -200,7 +200,7 @@ export function WheelEditor<T extends string>({
             );
           })}
           <div role={centerEditable ? 'button' : undefined} tabIndex={centerEditable ? 0 : undefined} aria-label={centerLabel ?? t.wheelCenterLabel(trigger, name(center))}
-            title={t.wheelCenterLabel(trigger, name(center))}
+            title={centerLabel ?? t.wheelCenterLabel(trigger, name(center))}
             className={`weCenter${hot === 'center' ? ' hot' : ''}${centerOn ? '' : ' off'}${isPicked((p) => p.from === 'center')}`}
             {...(centerEditable ? dragProps({ from: 'center', id: center }) : {})} {...(centerEditable ? dropProps('center') : {})}
             onClick={() => { if (centerEditable) clickTarget('center', { from: 'center', id: center }); }}

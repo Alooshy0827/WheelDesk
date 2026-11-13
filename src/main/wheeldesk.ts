@@ -17,9 +17,12 @@ import { ProviderError, type Part } from './teammate/providers/types';
 import { ActionRunner, type ExecutionContext, type RunTarget } from './workbench/runner';
 import { runScript } from './workbench/scripts';
 import { DesktopSurfaces, deskWindow, loadDesk } from './workbench/surfaces';
+import { registerDeskScheme, serveDeskScheme } from './workbench/protocol';
+import { isPingId } from '../shared/pings';
 
 const mac = process.platform === 'darwin';
 const platform = mac ? 'mac' : 'win';
+registerDeskScheme();
 app.setName('WheelDesk');
 app.setPath('userData', process.env.WHEELDESK_DATA_DIR || join(app.getPath('appData'), 'WheelDesk'));
 if (!app.requestSingleInstanceLock()) app.quit();
@@ -280,14 +283,23 @@ async function handle(sender: Electron.WebContents, raw: unknown): Promise<DeskR
   if ((!isSettings && !isResult && !isOverlay) || !record(raw) || typeof raw.type !== 'string') return { ok: false };
   if (raw.type === 'state') return { ok: true, state: state() };
   if (raw.type === 'capture' && isOverlay) { surfaces.captureReply(sender.id, raw.rect); return { ok: true }; }
+  if (raw.type === 'overlayIdle' && isOverlay && typeof raw.idle === 'boolean') {
+    surfaces.idle(sender.id, raw.idle); return { ok: true };
+  }
   if (isOverlay) return { ok: false };
   switch (raw.type) {
+    case 'previewEffect': {
+      if (!isSettings || !isPingId(raw.effect)) return { ok: false };
+      await surfaces.preview(raw.effect); return { ok: true };
+    }
     case 'save': {
       if (!isSettings || !record(raw.settings)) return { ok: false };
       const s = raw.settings;
       const normalized = normalizeSettings({ ...store.get(), workbench: normalizeWorkbench(s.workbench),
         trigger: s.trigger, dragThresholdPx: s.dragThresholdPx, language: s.language,
-        enabledOnStart: s.enabledOnStart, launchAtStartup: s.launchAtStartup }, platform);
+        enabledOnStart: s.enabledOnStart, launchAtStartup: s.launchAtStartup,
+        wheelSizePx: s.wheelSizePx, pingSizePx: s.pingSizePx, pingDurationS: s.pingDurationS,
+        volume: s.volume, muted: s.muted, tickSound: s.tickSound }, platform);
       const problems = store.problems.length;
       store.update(normalized); await store.flush();
       if (store.problems.length > problems) throw new Error('saveFailed');
@@ -350,6 +362,7 @@ app.on('before-quit', event => {
   void Promise.all([bridge.stop(), context.stop(), store.flush()]).finally(() => app.quit());
 });
 void app.whenReady().then(async () => {
+  serveDeskScheme(join(__dirname, '../renderer'));
   store = new SettingsStore(app.getPath('userData'), 100, platform);
   store.load();
   bridge = new InputBridge({ command: helperPath('hook-helper') });
@@ -365,7 +378,7 @@ void app.whenReady().then(async () => {
   surfaces = new DesktopSurfaces(mac, state, point => { origin = snapshot(point); void origin.catch(() => undefined); },
     (id, point) => { const prepared = origin; origin = null; void start(id, point, prepared ?? undefined).catch(presentError); });
   surfaces.refresh();
-  const refresh = () => { surfaces.cancel(); surfaces.refresh(); };
+  const refresh = () => { surfaces.cancel(true); surfaces.refresh(); };
   screen.on('display-added', refresh); screen.on('display-removed', refresh); screen.on('display-metrics-changed', refresh);
   bridge.on('event', (event: HelperEvent) => {
     if (event.type === 'toggled') store.update({ enabledOnStart: event.enabled });

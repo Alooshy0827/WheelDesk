@@ -3,7 +3,7 @@ import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   ALL_PINGS, DEFAULT_WHEEL, DEFAULT_WHEEL_PINGS, FALLBACK_TEXTURE, LOGO_TEXTURE, allTextureNames, pingById,
-  soundUrl, textureUrl,
+  allSoundNames, soundUrl, textureUrl,
 } from '../../src/shared/pings';
 
 const assets = resolve(__dirname, '../../assets');
@@ -41,8 +41,10 @@ describe('ping table', () => {
     expect(new Set(ALL_PINGS.map((p) => p.id)).size).toBe(ALL_PINGS.length);
   });
 
-  it('ships no original game assets in this independent product', () => {
-    expect(existsSync(assets)).toBe(false);
+  it('ships the original wheel effect art and sound requested for custom action slots', () => {
+    for (const name of allTextureNames()) expect(existsSync(resolve(assets, 'textures', `${name}.png`)), name).toBe(true);
+    for (const name of allSoundNames()) expect(existsSync(resolve(assets, 'sounds', `${name}.wav`)), name).toBe(true);
+    expect(existsSync(resolve(assets, 'emotes'))).toBe(false);
   });
 
   it('keeps the logo among the textures the build ships, though no ping draws it', () => {

@@ -1,8 +1,8 @@
 import { BrowserWindow, screen, type Display } from 'electron';
 import { join } from 'node:path';
 import { DESK_CH, type DeskOverlay, type DeskState, type Point } from '../../shared/ipc';
-import { pickSlice } from '../../shared/geometry';
-import { WHEEL_CENTER_RADIUS } from '../../shared/actions';
+import { pickSlice, WHEEL } from '../../shared/geometry';
+import { isPingId, type PingId } from '../../shared/pings';
 import { physicalToDip, type DisplayMap } from '../coords';
 import type { HelperEvent } from '../../shared/protocol';
 
@@ -10,11 +10,12 @@ export type SurfaceRole = 'settings' | 'result' | 'overlay';
 export function loadDesk(win: BrowserWindow, role: SurfaceRole): Promise<void> {
   const dev = process.env.ELECTRON_RENDERER_URL;
   return dev ? win.loadURL(`${dev}/workbench/index.html#${role}`)
-    : win.loadFile(join(__dirname, '../renderer/workbench/index.html'), { hash: role });
+    : win.loadURL(`wheeldesk://app/workbench/index.html#${role}`);
 }
 export function deskWindow(options: Electron.BrowserWindowConstructorOptions): BrowserWindow {
   const win = new BrowserWindow({ backgroundColor: '#f6f7f9', show: false, autoHideMenuBar: true, ...options,
-    webPreferences: { preload: join(__dirname, '../preload/workbench.js'), sandbox: true, contextIsolation: true, nodeIntegration: false },
+    webPreferences: { preload: join(__dirname, '../preload/workbench.js'), sandbox: true, contextIsolation: true,
+      nodeIntegration: false, autoplayPolicy: 'no-user-gesture-required' },
   });
   win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
   win.webContents.on('will-navigate', e => e.preventDefault());
@@ -24,13 +25,35 @@ export class DesktopSurfaces {
   private overlays = new Map<number, BrowserWindow>();
   private ready = new Map<number, Promise<void>>();
   private maps: DisplayMap[] = [];
-  private gesture: { serial: number; displayId: number; origin: Point; slots: (string | null)[] } | null = null;
+  private gesture: { serial: number; displayId: number; origin: Point; slots: (string | null)[];
+    labels: string[]; effects: PingId[]; visual: NonNullable<DeskOverlay['visual']> } | null = null;
   private serial = 0;
   private capturePending: { resolve: (v: { display: DisplayMap; rect: { x: number; y: number; w: number; h: number } }) => void;
     reject: (error: Error) => void } | null = null;
   constructor(private readonly mac: boolean, private readonly state: () => DeskState,
     private readonly opened: (point: Point) => void, private readonly chosen: (id: string, point: Point) => void) {}
   role(id: number): boolean { return [...this.overlays.values()].some(w => w.webContents.id === id); }
+  private visual(): NonNullable<DeskOverlay['visual']> {
+    const { wheelSizePx, pingSizePx, pingDurationS, volume, muted, tickSound } = this.state().settings;
+    return { wheelSizePx, pingSizePx, pingDurationS, volume, muted, tickSound };
+  }
+  idle(sender: number, idle: boolean): void {
+    const entry = [...this.overlays].find(([, w]) => w.webContents.id === sender);
+    if (!entry || this.capturePending) return;
+    if (idle && this.gesture?.displayId !== entry[0]) entry[1].hide();
+    else if (!idle) entry[1].showInactive();
+  }
+  async preview(effect: string): Promise<void> {
+    if (!isPingId(effect) || this.gesture || this.capturePending) return;
+    this.refresh();
+    const cursor = screen.getCursorScreenPoint();
+    const display = screen.getDisplayNearestPoint(cursor);
+    await this.ready.get(display.id);
+    if (this.gesture || this.capturePending) return;
+    this.send(display.id, { type: 'effect', effect, x: cursor.x - display.bounds.x, y: cursor.y - display.bounds.y,
+      visual: this.visual() });
+    this.overlays.get(display.id)?.showInactive();
+  }
   private send(id: number, event: DeskOverlay): void {
     const win = this.overlays.get(id);
     if (win && !win.isDestroyed()) win.webContents.send(DESK_CH.overlay, event);
@@ -53,13 +76,15 @@ export class DesktopSurfaces {
       focusable: false, resizable: false, movable: false, minimizable: false, maximizable: false,
       fullscreenable: false, hasShadow: false, skipTaskbar: true, alwaysOnTop: true, enableLargerThanScreen: true });
     win.setIgnoreMouseEvents(true);
+    // Like the upstream overlay: a non-focusing window must still animate at full speed.
+    win.webContents.setBackgroundThrottling(false);
     win.setAlwaysOnTop(true, 'screen-saver');
     if (this.mac) win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
     this.overlays.set(d.id, win);
     this.ready.set(d.id, loadDesk(win, 'overlay'));
   }
   handle(event: HelperEvent): void {
-    if (event.type === 'cancel') { this.cancel(); return; }
+    if (event.type === 'cancel') { if (!this.capturePending) this.cancel(); return; }
     if (event.type === 'wheelOpen') {
       this.refresh();
       const p = physicalToDip(event.x, event.y, this.maps);
@@ -70,14 +95,17 @@ export class DesktopSurfaces {
       if (!wheel) return;
       this.cancel();
       const serial = ++this.serial;
-      this.gesture = { serial, displayId: p.display.id, origin: { x: p.x, y: p.y }, slots: [...wheel.slots] };
-      this.opened({ x: event.x, y: event.y });
       const items = wheel.slots.map(id => wb.actions.find(a => a.id === id));
+      const labels = items.map(a => a ? lang === 'en' ? a.nameEn || a.name : a.name : '');
+      const visual = this.visual();
+      this.gesture = { serial, displayId: p.display.id, origin: { x: p.x, y: p.y }, slots: [...wheel.slots],
+        labels, effects: [...wheel.effects], visual };
+      this.opened({ x: event.x, y: event.y });
       void this.ready.get(p.display.id)?.then(() => {
         if (this.gesture?.serial !== serial) return;
         this.send(p.display.id, { type: 'open', x: p.x - p.display.dip.x, y: p.y - p.display.dip.y,
           name: lang === 'en' ? wheel.nameEn || wheel.name : wheel.name, lang,
-          labels: items.map(a => a ? lang === 'en' ? a.nameEn || a.name : a.name : ''), kinds: items.map(a => a?.kind ?? '') });
+          labels, effects: [...wheel.effects], enabled: items.map(a => !!a), visual });
         this.overlays.get(p.display.id)?.showInactive();
       });
       return;
@@ -89,19 +117,31 @@ export class DesktopSurfaces {
     if (!p || !map) { this.cancel(); return; }
     if (event.type === 'wheelMove') this.send(g.displayId, { type: 'move', x: p.x - map.dip.x, y: p.y - map.dip.y });
     else {
-      const index = pickSlice(p.x - g.origin.x, p.y - g.origin.y, WHEEL_CENTER_RADIUS);
+      const index = pickSlice(p.x - g.origin.x, p.y - g.origin.y, WHEEL.innerR * g.visual.wheelSizePx / WHEEL.size);
       const actionId = index >= 0 ? g.slots[index] : null;
       this.cancel();
-      if (actionId) this.chosen(actionId, { x: map.phys.x + (g.origin.x - map.dip.x) * map.scale,
-        y: map.phys.y + (g.origin.y - map.dip.y) * map.scale });
+      if (actionId) {
+        this.send(g.displayId, { type: 'effect', effect: g.effects[index], name: g.labels[index],
+          x: g.origin.x - map.dip.x, y: g.origin.y - map.dip.y, visual: g.visual });
+        this.overlays.get(g.displayId)?.showInactive();
+        this.chosen(actionId, { x: map.phys.x + (g.origin.x - map.dip.x) * map.scale,
+          y: map.phys.y + (g.origin.y - map.dip.y) * map.scale });
+      }
     }
   }
-  cancel(): void {
+  cancel(immediate = false): void {
+    if (this.capturePending) {
+      if (!immediate) return;
+      this.capturePending.reject(new Error('cancelled'));
+    }
     this.gesture = null;
-    for (const [id, win] of this.overlays) { this.send(id, { type: 'close' }); win.hide(); }
+    for (const [id, win] of this.overlays) {
+      this.send(id, { type: 'close', clear: immediate });
+      if (immediate) win.hide();
+    }
   }
   async selectRegion(signal: AbortSignal): Promise<{ display: DisplayMap; rect: { x: number; y: number; w: number; h: number } }> {
-    this.cancel(); this.refresh();
+    this.cancel(true); this.refresh();
     signal.throwIfAborted();
     await Promise.all(this.ready.values());
     signal.throwIfAborted();
@@ -118,7 +158,10 @@ export class DesktopSurfaces {
       });
     } finally {
       this.capturePending = null;
-      for (const win of this.overlays.values()) { win.hide(); win.setIgnoreMouseEvents(true); win.setFocusable(false); }
+      for (const [id, win] of this.overlays) {
+        this.send(id, { type: 'close', clear: true });
+        win.hide(); win.setIgnoreMouseEvents(true); win.setFocusable(false);
+      }
     }
   }
   captureReply(sender: number, raw: unknown): void {

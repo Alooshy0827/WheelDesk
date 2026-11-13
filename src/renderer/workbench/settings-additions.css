@@ -14,3 +14,5 @@
 .wdSettings .mateHead { flex-wrap: wrap; }
 .wdSettings .mateHead > b { min-width: 100px; overflow-wrap: anywhere; }
 @media (max-width: 950px) { .wdSettings .weBody { gap: 12px; grid-template-columns: 300px minmax(0,1fr); } .wdSettings .weTiles { grid-template-columns: repeat(2,minmax(64px,1fr)); } }
+
+.wdBinding{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--stroke)}.wdBinding:last-child{border-bottom:0}.wdBinding>img{width:32px;height:32px;object-fit:contain}.wdBinding>div{flex:1}.wdBinding>.fui-Dropdown{width:260px;max-width:60%}.wdBindings>.desc{margin-top:8px}

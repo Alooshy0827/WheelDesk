@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { defaultWorkbench, newAction, normalizeWorkbench, parseShortcut, validateWorkflow } from '../../src/shared/actions';
+import { defaultWorkbench, newAction, normalizeWorkbench, parseShortcut, setWheelEffects, validateWorkflow } from '../../src/shared/actions';
+import { DEFAULT_WHEEL } from '../../src/shared/pings';
 
 describe('workbench configuration', () => {
   it('ships two usable eight-slot wheels with independent action ids', () => {
@@ -36,6 +37,30 @@ describe('workbench configuration', () => {
     const s = normalizeWorkbench({ actions: [{ ...newAction('a', 'script'), mac: source, windows: source }] });
     expect(s.actions[0].mac).toBe('');
     expect(s.actions[0].windows).toBe('');
+  });
+  it('migrates old wheels to original effects without changing their actions', () => {
+    const before = defaultWorkbench();
+    const wheels = before.wheels.map(({ effects: _, ...wheel }) => wheel);
+    const migrated = normalizeWorkbench({ ...before, wheels });
+    expect(migrated.wheels[0].effects).toEqual(DEFAULT_WHEEL);
+    expect(migrated.wheels.map(w => w.slots)).toEqual(before.wheels.map(w => w.slots));
+  });
+  it('moves functions with dragged effects and preserves functions when replacing an effect', () => {
+    const wheel = defaultWorkbench().wheels[0];
+    const effects = [...wheel.effects]; [effects[0], effects[3]] = [effects[3], effects[0]];
+    const moved = setWheelEffects(wheel, effects);
+    expect(moved.slots[0]).toBe(wheel.slots[3]);
+    expect(moved.slots[3]).toBe(wheel.slots[0]);
+    const replaced = setWheelEffects(wheel, ['bait', ...wheel.effects.slice(1)]);
+    expect(replaced.slots).toEqual(wheel.slots);
+    expect(replaced.effects[0]).toBe('bait');
+  });
+  it('repairs unknown and duplicate effects to eight unique built-in effects', () => {
+    const s = defaultWorkbench();
+    const normalized = normalizeWorkbench({ ...s, wheels: [{ ...s.wheels[0], effects: ['missing', 'missing', 'bad'] }] });
+    expect(new Set(normalized.wheels[0].effects).size).toBe(8);
+    expect(normalized.wheels[0].effects[0]).toBe('missing');
+    expect(normalized.wheels[0].slots).toEqual(s.wheels[0].slots);
   });
 });
 describe('workflow validation', () => {

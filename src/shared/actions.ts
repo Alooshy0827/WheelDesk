@@ -1,6 +1,5 @@
 import type { BuiltinProfile } from './teammate/settings';
-
-export const WHEEL_CENTER_RADIUS = 61;
+import { ALL_PINGS, DEFAULT_WHEEL, isPingId, type PingId } from './pings';
 
 export type InputSource = 'none' | 'selection' | 'clipboard' | 'manual' | 'screenshot' | 'previous';
 export type ActionKind = 'shortcut' | 'openApp' | 'openPath' | 'openUrl' | 'readClipboard' | 'writeClipboard'
@@ -21,7 +20,7 @@ export interface ActionDefinition {
   timeoutS: number;
   output: 'card' | 'copy' | 'paste';
 }
-export interface WheelProfile { id: string; name: string; nameEn: string; slots: (string | null)[] }
+export interface WheelProfile { id: string; name: string; nameEn: string; slots: (string | null)[]; effects: PingId[] }
 export interface WorkflowStep { id: string; actionId: string; input: InputSource }
 export interface WorkflowDefinition { id: string; name: string; steps: WorkflowStep[] }
 export interface WorkbenchSettings {
@@ -74,8 +73,8 @@ export function defaultWorkbench(): WorkbenchSettings {
     action('toTools', '常用工具', 'Everyday tools', 'switchWheel', { value: 'tools' }),
   ];
   return { version: 1, activeWheelId: 'tools', actions, workflows: [], profiles: [], defaultProfileId: '', wheels: [
-    { id: 'tools', name: '常用工具', nameEn: 'Everyday tools', slots: actions.slice(0, 8).map(a => a.id) },
-    { id: 'ai', name: 'AI 助手', nameEn: 'AI assistant', slots: actions.slice(8).map(a => a.id) },
+    { id: 'tools', name: '常用工具', nameEn: 'Everyday tools', slots: actions.slice(0, 8).map(a => a.id), effects: [...DEFAULT_WHEEL] },
+    { id: 'ai', name: 'AI 助手', nameEn: 'AI assistant', slots: actions.slice(8).map(a => a.id), effects: [...DEFAULT_WHEEL] },
   ] };
 }
 const obj = (x: unknown): x is Record<string, unknown> => !!x && typeof x === 'object' && !Array.isArray(x);
@@ -86,6 +85,27 @@ const idOf = (x: unknown): string => typeof x === 'string' && /^[a-zA-Z0-9_-]{1,
 const list = (x: unknown): unknown[] => Array.isArray(x) ? x.slice(0, 200) : [];
 const unique = <T extends { id: string }>(items: T[]): T[] => items.filter((a, i) => a.id && items.findIndex(b => b.id === a.id) === i);
 export const inputOf = (x: unknown): InputSource => INPUT_SOURCES.includes(x as InputSource) ? x as InputSource : 'none';
+
+/** Older WheelDesk settings gain the original effects without changing their action bindings. */
+export function normalizeEffects(raw: unknown): PingId[] {
+  const source = Array.isArray(raw) ? raw : [];
+  const effects: PingId[] = [];
+  for (let i = 0; i < 8; i++) {
+    const desired = source[i];
+    const fallback = [...DEFAULT_WHEEL, ...ALL_PINGS.map(p => p.id)].find(id => !effects.includes(id)) ?? 'generic';
+    effects.push(isPingId(desired) && !effects.includes(desired) ? desired : fallback);
+  }
+  return effects;
+}
+
+/** Dragging a slot moves its effect and binding together; replacing artwork preserves that slot's action. */
+export function setWheelEffects(wheel: WheelProfile, effects: readonly string[]): WheelProfile {
+  const next = normalizeEffects(effects);
+  return { ...wheel, effects: next, slots: next.map((id, i) => {
+    const from = wheel.effects.indexOf(id);
+    return wheel.slots[from >= 0 ? from : i];
+  }) };
+}
 
 /** Rebuilds persisted and IPC configuration without accepting arbitrary executable fields. */
 export function normalizeWorkbench(raw: unknown): WorkbenchSettings {
@@ -104,9 +124,10 @@ export function normalizeWorkbench(raw: unknown): WorkbenchSettings {
     if (!obj(v) || !idOf(v.id)) return [];
     const slots = list(v.slots);
     return [{ id: idOf(v.id), name: str(v.name, 80), nameEn: str(v.nameEn, 80),
+      effects: normalizeEffects(v.effects),
       slots: Array.from({ length: 8 }, (_, i) => actions.some(a => a.id === slots[i]) ? String(slots[i]) : null) }];
   }));
-  if (!wheels.length) wheels.push({ id: 'tools', name: '常用工具', nameEn: 'Everyday tools', slots: Array(8).fill(null) });
+  if (!wheels.length) wheels.push({ id: 'tools', name: '常用工具', nameEn: 'Everyday tools', slots: Array(8).fill(null), effects: [...DEFAULT_WHEEL] });
   const workflows = unique(list(raw.workflows).flatMap(v => {
     if (!obj(v) || !idOf(v.id)) return [];
     return [{ id: idOf(v.id), name: str(v.name, 80), steps: list(v.steps).slice(0, 50).flatMap(s =>

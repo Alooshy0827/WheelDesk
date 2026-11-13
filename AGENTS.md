@@ -1,6 +1,6 @@
 # Working on WheelDesk
 
-WheelDesk is an independent fork of lolPing at c97fe772b98514b83f011ee540601faabd066d23. Preserve LICENSE and NOTICE.md. The current product targets macOS 13+ Apple Silicon and Windows 11 x64. Linux, game artwork, rooms and coding-agent automation are outside the product.
+WheelDesk is an independent fork of lolPing at c97fe772b98514b83f011ee540601faabd066d23. Preserve LICENSE and NOTICE.md. The current product targets macOS 13+ Apple Silicon and Windows 11 x64. Linux, emotes, rooms and coding-agent automation are outside the product.
 
 ## Entry points
 
@@ -16,7 +16,7 @@ The settings UI must retain the upstream lolPing layout and components. Extend i
 
 Ordinary input always passes through unchanged; paused input swallows nothing. A gesture dispatches exactly once from the main process. Preserve multi-monitor coordinate conventions. New settings need normalization/defaults. IPC input is unknown until checked; renderers cannot execute arbitrary commands. Keys are encrypted and never logged or returned to a renderer. A text-only AI action never captures the screen. No model decides which system actions execute.
 
-Use strict TypeScript, two spaces, single quotes and semicolons. Avoid any, non-null assertions and compiler suppression. Keep OS code gated. Use localized English and Simplified Chinese strings. Pin new dependencies exactly. Preserve upstream attribution while removing game media from deliverables.
+Use strict TypeScript, two spaces, single quotes and semicolons. Avoid any, non-null assertions and compiler suppression. Keep OS code gated. Use localized English and Simplified Chinese strings. Pin new dependencies exactly. Preserve upstream attribution, including the separate Riot media notice. The user explicitly requested the original ping-wheel effects: reuse upstream Wheel, PingFx, SoundBank, textures, audio and timing; bind functions independently from effect IDs.
 
 ## Checks
 
