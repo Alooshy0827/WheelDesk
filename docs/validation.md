@@ -6,8 +6,10 @@ Version: 0.1.0 internal beta. Host: Apple Silicon, macOS 26.6. Target: macOS 13+
 
 - `npm run typecheck`: passed.
 - `npm run test:helper`: 692 input assertions, 544 context assertions, 26 macOS callback assertions; all passed (1,262 total). The context tests include shortcut validation, held modifiers, target changes and elevated targets.
-- `npm test`: 132 files passed; 2,061 tests passed, 5 skipped. Includes upstream regressions, configuration repair, workflow sequencing/failure/cancel/snapshots, actual scripts, provider fixtures and credential boundaries.
+- `npm test`: 132 files passed; 2,062 tests passed, 5 skipped. Includes upstream regressions, configuration repair, workflow sequencing/failure/cancel/snapshots, actual scripts, provider fixtures and credential boundaries.
 - `npm run build`: passed.
+
+- GitHub Actions: [initial cross-platform check](https://github.com/Alooshy0827/WheelDesk/actions/runs/43441701375) passed on both native platforms.
 
 ## Desktop validation
 
@@ -20,7 +22,7 @@ Checks include settings rendering, Chinese text, section navigation, light/dark 
 - macOS 13 specifically has not been tested; this host runs macOS 26.6.
 - Global gestures, normal input passthrough, multi-monitor mixed scaling, selected-text extraction, screen capture, clipboard restoration and target-window fill-back still require hands-on OS acceptance. The hook helper initially reported missing Accessibility access and later started successfully, but a running helper alone is not evidence that these interactions passed.
 - Real API credentials, live provider rate limits and model image capability require user-configured services. Automated provider tests use mocks.
-- Windows compilation/interaction, installation/uninstallation and executable delivery are pending. A native Windows CI/build workflow is included.
+- GitHub Actions run 43441701375 passed typecheck, native helper tests, JavaScript tests and production build on both Windows and macOS. Windows desktop interaction, installation/uninstallation and executable delivery remain pending.
 - The macOS beta is ad-hoc signed, without Apple notarization. Permission grants may need refreshing after rebuilding.
 
 This is an internal beta, not a claim that every item in the original two-platform acceptance plan has passed.

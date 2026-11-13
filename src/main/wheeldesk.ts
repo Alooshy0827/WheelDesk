@@ -24,9 +24,11 @@ app.setName('WheelDesk');
 app.setPath('userData', process.env.WHEELDESK_DATA_DIR || join(app.getPath('appData'), 'WheelDesk'));
 if (!app.requestSingleInstanceLock()) app.quit();
 let settingsWindow: BrowserWindow | null = null;
+let settingsReady: Promise<void> | null = null;
 let resultWindow: BrowserWindow | null = null;
 let tray: Tray | null = null;
 let quitting = false;
+let initialized = false;
 let store: SettingsStore;
 let bridge: InputBridge;
 let context: ContextClient;
@@ -66,8 +68,9 @@ async function showSettings(): Promise<void> {
     window.on('closed', () => nativeTheme.off('updated', onTheme));
     if (mac) window.on('restore', () => { window.setVibrancy(null); window.setVibrancy('sidebar'); });
     settingsWindow.on('close', event => { if (!quitting) { event.preventDefault(); settingsWindow?.hide(); } });
-    await loadDesk(settingsWindow, 'settings');
+    settingsReady = loadDesk(settingsWindow, 'settings');
   }
+  await settingsReady;
   settingsWindow.show(); settingsWindow.focus(); broadcast();
 }
 async function showResult(focus = false): Promise<void> {
@@ -91,7 +94,8 @@ function configure(): void {
   // The native gesture channel stays compatible; only its primary wheel is used in WheelDesk.
   bridge.send(configCommand({ ...settings, emoteTrigger: 'off', clickPing: false,
     features: { ...settings.features, emotes: false, rooms: false, teammate: false } }, settings.enabledOnStart));
-  if (app.isPackaged) app.setLoginItemSettings({ openAtLogin: settings.launchAtStartup, args: ['--hidden'] });
+  if (app.isPackaged && app.getLoginItemSettings().openAtLogin !== settings.launchAtStartup)
+    app.setLoginItemSettings({ openAtLogin: settings.launchAtStartup, args: ['--hidden'] });
   tray?.setContextMenu(Menu.buildFromTemplate([
     { label: 'WheelDesk', enabled: false },
     ...settings.workbench.wheels.map(w => ({ label: label(w), type: 'radio' as const,
@@ -336,8 +340,8 @@ async function handle(sender: Electron.WebContents, raw: unknown): Promise<DeskR
     default: return { ok: false };
   }
 }
-app.on('second-instance', () => void showSettings());
-app.on('activate', () => { if (store) void showSettings(); });
+app.on('second-instance', () => { if (initialized) void showSettings(); });
+app.on('activate', () => { if (initialized) void showSettings(); });
 app.on('window-all-closed', () => undefined);
 app.on('before-quit', event => {
   if (quitting || !bridge) return;
@@ -377,6 +381,7 @@ void app.whenReady().then(async () => {
     catch (e) { return { ok: false, error: deskError(e instanceof Error ? e.message : 'failed', language()) }; }
   });
   store.on('change', configure);
+  initialized = true;
   configure(); bridge.start();
   if (!process.argv.includes('--hidden')) await showSettings();
 }).catch(error => { console.error('WheelDesk startup:', error instanceof Error ? error.message : 'failed'); app.quit(); });

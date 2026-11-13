@@ -63,6 +63,7 @@ export class SecretStore {
   }
 
   key(profileId: string): string | null {
+    if (!Object.hasOwn(this.data.keys, profileId)) return null;
     if (!this.available()) return null;
     return Object.hasOwn(this.data.keys, profileId) ? this.data.keys[profileId] : null;
   }
@@ -97,7 +98,7 @@ export class SecretStore {
   private load(): void {
     // A missing file means nothing is stored yet. One that can't be decrypted (a keychain prompt the user denied) or
     // parsed reads as empty, but is kept: see keepUnreadable.
-    if (!this.available() || !existsSync(this.file)) return;
+    if (!existsSync(this.file) || !this.available()) return;
     try {
       this.data = parse(this.crypto.decryptString(readFileSync(this.file)));
       this.unread = false;

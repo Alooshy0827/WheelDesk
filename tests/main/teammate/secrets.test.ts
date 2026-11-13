@@ -17,6 +17,13 @@ const fakeCrypto = (available = true): Crypto => ({
 const file = () => join(mkdtempSync(join(tmpdir(), 'lolping-secrets-')), 'teammate', 'secrets');
 
 describe('SecretStore', () => {
+  it('does not prompt for keychain access on a first run with no saved keys', () => {
+    const crypto = fakeCrypto();
+    crypto.isEncryptionAvailable = () => { throw new Error('unexpected keychain prompt'); };
+    const store = new SecretStore(file(), crypto);
+    expect(store.key('local-model')).toBeNull();
+    expect(store.hasKey('local-model')).toBe(false);
+  });
   it('round-trips a key and the instructions', async () => {
     const path = file();
     const store = new SecretStore(path, fakeCrypto());
