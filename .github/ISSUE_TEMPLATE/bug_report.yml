@@ -1,0 +1,34 @@
+name: Bug report
+description: Something in WheelDesk doesn't work as expected
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What did you do, what did you expect, and what happened instead?
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: WheelDesk version
+      description: The bottom of Settings shows it.
+      placeholder: 0.1.0
+    validations:
+      required: true
+  - type: input
+    id: os
+    attributes:
+      label: Operating system and desktop session
+      placeholder: Windows 11 or macOS 13+ on Apple Silicon
+  - type: textarea
+    id: setup
+    attributes:
+      label: Displays and settings
+      description: Number of monitors and their scale (100 %, 150 %…), the trigger key, and the target application.
+  - type: textarea
+    id: problems
+    attributes:
+      label: Error message
+      description: Paste the error message, excluding keys and private content.

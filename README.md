@@ -1,0 +1,65 @@
+# WheelDesk
+
+[简体中文](README.zh-CN.md) · Internal beta 0.1.0
+
+A desktop action wheel for everyday tools, AI instructions, and local workflows. Hold Alt (Option on macOS), drag, and release on an action. Move back into the center, press Escape, or right-click to cancel.
+
+Based on [lolPing](https://github.com/darrenprx/lolPing), revision `c97fe772b98514b83f011ee540601faabd066d23`. The MIT license and original attribution are preserved. Riot Games artwork, sounds, emotes and room features are not included in the application.
+
+## Features
+
+The settings UI is modified directly from lolPing: its Fluent controls, platform themes, scroll navigation, grouped rows and drag-and-drop wheel editor are reused.
+
+- Multiple editable eight-slot wheels; switch in the tray or with a wheel action.
+- Keyboard shortcuts, applications, files, folders, URLs, clipboard operations and region screenshots.
+- OpenAI-compatible and Anthropic APIs, including local endpoints. Choose a model and instruction per action.
+- Streamed answer cards with copy and guarded fill-back. Text actions do not automatically send screenshots.
+- Linear workflows with explicit inputs and previous-step outputs. Shell on macOS and PowerShell on Windows receive input on stdin.
+- One active run, cancellation, per-action timeouts and a 1 MB script-output limit.
+- English and Simplified Chinese settings, encrypted API keys, optional login startup.
+
+## Install and use
+
+The current delivery targets macOS 13+ on Apple Silicon. Windows 11 x64 source and native build workflow are included; a Windows installer is deferred.
+
+Open the DMG and drag WheelDesk to Applications. This internal build is ad-hoc signed, not notarized. If macOS blocks it, use System Settings → Privacy & Security → Open Anyway for this application.
+
+1. Open WheelDesk. In Settings, open Accessibility settings and allow WheelDesk, then use **Retry input helper**. Rebuilding an ad-hoc-signed app may require removing its old Accessibility entry and granting access again.
+2. Grant Screen Recording when using screenshots. Screen capture stays off until you choose a screenshot action.
+3. In Models, add a base URL, model ID and optional API key. Configuration edits save automatically; save the key with its separate button. A successful model-list check does not guarantee image support.
+4. Edit slots in Wheels; changes save automatically. Use the tray to switch wheels.
+5. To test an action from settings, click Run and switch to the target application within the three-second countdown.
+
+A text action with no readable selection asks for input; it never silently sends the clipboard. Result cards do not activate the app while streaming. Fill-back requires the original window and selection; when they changed, copy the answer instead.
+
+## Workflows
+
+Create reusable actions first, then add ordered workflow steps. Choose each input explicitly: fixed content, selection, clipboard text, manual input, selected screenshot or previous result. A workflow is automatically added to the action library and can be assigned to a wheel slot.
+
+Scripts run as the current user. PowerShell execution policy is set only for the child process. No model-generated commands are executed automatically. Script working directories are temporary; use absolute paths for persistent files. A failed step stops the workflow. Cancellation stops the current script process group/tree; it does not undo steps already completed.
+
+## Build and test
+
+Requires Node 22.12+ and Xcode Command Line Tools on Apple Silicon, or Visual Studio 2022 C++ build tools on Windows.
+
+```sh
+npm ci
+npx install-electron
+npm run test:helper
+npm run typecheck
+npm test
+npm run dev
+npm run dist:mac
+# On Windows:
+npm run dist:win
+```
+
+`tools/smoke.cjs` runs the real application against a local mock model and an isolated data folder. After `npm run build`, set `WHEELDESK_DATA_DIR` to a temporary absolute folder and run `npm run smoke`. See [validation](docs/validation.md) for completed checks and unverified OS behavior.
+
+GitHub Actions checks both native platforms on push. **Build internal installers** is manually dispatched and uploads private workflow artifacts; it does not publish releases.
+
+## Data and privacy
+
+Settings are stored separately in `~/Library/Application Support/WheelDesk` or `%APPDATA%\WheelDesk`. API keys are encrypted with Electron safeStorage in `secrets.enc`, never included in ordinary settings. Results are kept in memory for the current run; screenshots and script files are removed after use. Only configured model endpoints receive AI requests. There is no backend account, telemetry, automatic update checker, room service, or cloud sync.
+
+The repository retains upstream source modules and regression tests to preserve compatibility of reused helpers/settings. Its only production main entry is `src/main/wheeldesk.ts`; original rooms, agents and game UI are not started. Original media assets are removed. See [NOTICE](NOTICE.md) and [design](docs/wheeldesk.md).

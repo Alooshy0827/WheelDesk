@@ -1,0 +1,16 @@
+/* Extend the upstream settings page only for WheelDesk's new configuration fields. */
+.wdSidebarFoot { margin-top: auto; padding: 20px 10px 10px; overflow-wrap: anywhere; display: flex; flex-direction: column; gap: 8px; }
+.wdButtons { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.wdEditor .wdButtons { margin-top: 14px; }
+.wdField { display: grid; grid-template-columns: 132px minmax(0,1fr); gap: 12px; margin-top: 12px; align-items: start; }
+.wdField > span { padding-top: 7px; }
+.wdField > div > .fui-Input, .wdField > div > .fui-Textarea, .wdField > div > .fui-Dropdown { width: 100%; box-sizing: border-box; }
+.wdField .desc { margin-top: 5px; }
+.wdCode textarea { font-family: 'SF Mono', Consolas, monospace; font-size: 12px; }
+.wdError { color: var(--colorPaletteRedForeground1); font-size: 12px; line-height: 1.5; }
+.wdSettings .statusPing { display: block; width: 46px; height: 46px; }
+.wdSettings .wePool { min-width: 0; }
+.wdSettings .weCenter { cursor: default; }
+.wdSettings .mateHead { flex-wrap: wrap; }
+.wdSettings .mateHead > b { min-width: 100px; overflow-wrap: anywhere; }
+@media (max-width: 950px) { .wdSettings .weBody { gap: 12px; grid-template-columns: 300px minmax(0,1fr); } .wdSettings .weTiles { grid-template-columns: repeat(2,minmax(64px,1fr)); } }
