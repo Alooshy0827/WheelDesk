@@ -62,6 +62,14 @@ describe('workbench configuration', () => {
     expect(normalized.wheels[0].effects[0]).toBe('missing');
     expect(normalized.wheels[0].slots).toEqual(s.wheels[0].slots);
   });
+  it('preserves every function when resetting a wheel with moved and replacement effects', () => {
+    const wheel = defaultWorkbench().wheels[0];
+    const swapped = setWheelEffects(wheel, ['push', 'danger', ...wheel.effects.slice(2)]);
+    const replaced = setWheelEffects(swapped, ['bait', ...swapped.effects.slice(1)]);
+    const reset = setWheelEffects(replaced, DEFAULT_WHEEL);
+    expect(reset.effects).toEqual(DEFAULT_WHEEL);
+    expect(reset.slots).toEqual(wheel.slots);
+  });
 });
 describe('workflow validation', () => {
   it('rejects image input to scripts before running any steps', () => {

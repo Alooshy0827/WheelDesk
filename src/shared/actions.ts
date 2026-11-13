@@ -101,9 +101,16 @@ export function normalizeEffects(raw: unknown): PingId[] {
 /** Dragging a slot moves its effect and binding together; replacing artwork preserves that slot's action. */
 export function setWheelEffects(wheel: WheelProfile, effects: readonly string[]): WheelProfile {
   const next = normalizeEffects(effects);
+  const origins = next.map(id => wheel.effects.indexOf(id));
+  const used = new Set(origins.filter(i => i >= 0));
   return { ...wheel, effects: next, slots: next.map((id, i) => {
-    const from = wheel.effects.indexOf(id);
-    return wheel.slots[from >= 0 ? from : i];
+    let from = origins[i];
+    if (from < 0) {
+      // Reset can replace several effects at once. Reuse each displaced binding exactly once.
+      from = !used.has(i) ? i : wheel.slots.findIndex((_, j) => !used.has(j));
+      used.add(from);
+    }
+    return wheel.slots[from] ?? null;
   }) };
 }
 

@@ -6,7 +6,7 @@ Version: 0.1.1 internal beta. Host: Apple Silicon, macOS 26.6. Target: macOS 13+
 
 - `npm run typecheck`: passed.
 - `npm run test:helper`: 692 input assertions, 544 context assertions, 26 macOS callback assertions; all passed (1,262 total). The context tests include shortcut validation, held modifiers, target changes and elevated targets.
-- `npm test`: 134 files passed; 2,077 tests passed, 5 skipped. Includes original-effect migration, moving effect/function pairs, gesture snapshots, one-shot dispatch, preview isolation, scaled hit testing, capture cleanup, local asset-origin boundaries, upstream regressions, configuration repair, workflow sequencing/failure/cancel/snapshots, actual scripts, provider fixtures and credential boundaries.
+- `npm test`: 134 files passed; 2,078 tests passed, 5 skipped. Includes original-effect migration, moving effect/function pairs, preserving every binding when resetting replaced effects, gesture snapshots, one-shot dispatch, preview isolation, scaled hit testing, capture cleanup, local asset-origin boundaries, upstream regressions, configuration repair, workflow sequencing/failure/cancel/snapshots, actual scripts, provider fixtures and credential boundaries.
 - `npm run build`: passed.
 - The first full test run, concurrent with the native compiler, hit the upstream PDF test’s 5-second timeout. A full rerun without that contention passed unchanged.
 
