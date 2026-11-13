@@ -17,6 +17,15 @@ Version: 0.1.0 internal beta. Host: Apple Silicon, macOS 26.6. Target: macOS 13+
 
 Checks include settings rendering, Chinese text, section navigation, light/dark themes, wheel slot editing and persistence, model listing, streamed text-only AI responses, usage, rejecting privileged operations from the result renderer, and a real local script action. It does not send data to an external model service.
 
+## macOS installer checks
+
+- DMG generated successfully; `hdiutil verify` passed.
+- DMG mounts read-only with WheelDesk.app and the Applications shortcut.
+- `codesign --verify --deep --strict` passed for the ad-hoc-signed app.
+- Both bundled native helpers are ARM64; app identifier is `app.wheeldesk.desktop`, minimum macOS is 13.0.
+- Packaged JavaScript matches the checked production build. LICENSE and NOTICE.md are present; no game media, credentials or node_modules are bundled.
+- The app was copied from the image to an isolated installation test directory and launched. A first-run keychain initialization issue was fixed. The installed application now displays the original-style settings page successfully, confirmed through its native accessibility tree and screenshot.
+
 ## Not yet accepted on real systems
 
 - macOS 13 specifically has not been tested; this host runs macOS 26.6.
