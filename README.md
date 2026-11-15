@@ -1,6 +1,6 @@
 # WheelDesk
 
-[简体中文](README.zh-CN.md) · Internal beta 0.1.6
+[简体中文](README.zh-CN.md) · Internal beta 0.1.7
 
 A desktop action wheel for everyday tools, AI instructions, and local workflows. Hold Alt (Option on macOS), drag, and release on an action. Move back into the center, press Escape, or right-click to cancel.
 
@@ -66,3 +66,5 @@ Settings are stored separately in `~/Library/Application Support/WheelDesk` or `
 The repository retains upstream source modules and regression tests to preserve compatibility of reused helpers/settings. Its only production main entry is `src/main/wheeldesk.ts`; rooms, agents and emote UI are not started. The original ping wheel and effects are part of WheelDesk. See [NOTICE](NOTICE.md) and [design](docs/wheeldesk.md).
 
 macOS packaging requires the original private signing identity. Hosted Actions deliberately fails macOS packaging until that identity is securely provisioned; never bypass this with ad-hoc signing. See [signing setup and backup](docs/wheeldesk.md#stable-macos-update-identity).
+
+Ordinary system actions run without a result popup. AI and scripts respect their output mode; workflows retain progress and cancellation. Input requests and failures still display the required dialog.

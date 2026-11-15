@@ -21,6 +21,7 @@ import { DesktopSurfaces, deskWindow, loadDesk } from './workbench/surfaces';
 import { registerDeskScheme, serveDeskScheme } from './workbench/protocol';
 import { isPingId } from '../shared/pings';
 import { checkInputAccess, PermissionRecovery } from './workbench/permissionRecovery';
+import { shouldShowRun } from './workbench/presentation';
 
 const mac = process.platform === 'darwin';
 const platform = mac ? 'mac' : 'win';
@@ -46,7 +47,6 @@ let origin: Promise<RunTarget> | null = null;
 let requestedInput: { resolve: (text: string) => void; reject: (error: Error) => void } | null = null;
 let starting = false;
 let cardReady: Promise<void> | null = null;
-let hideTimer: NodeJS.Timeout | null = null;
 const helperPath = (name: string) => app.isPackaged ? mac ? join(process.resourcesPath, '../Helpers', name) : join(process.resourcesPath, name + '.exe')
   : join(app.getAppPath(), 'native/hook-helper/build', name + (mac ? '' : '.exe'));
 const language = () => resolveLang(store.get().language, app.getLocale());
@@ -79,7 +79,7 @@ async function showSettings(): Promise<void> {
   await settingsReady;
   settingsWindow.show(); settingsWindow.focus(); broadcast();
 }
-async function showResult(focus = false): Promise<void> {
+async function showResult(focus = false, stillNeeded: () => boolean = () => true): Promise<void> {
   if (!resultWindow || resultWindow.isDestroyed()) {
     const d = screen.getDisplayNearestPoint(screen.getCursorScreenPoint());
     resultWindow = deskWindow({ title: 'WheelDesk', width: 440, height: 500, minWidth: 360, minHeight: 300,
@@ -91,6 +91,7 @@ async function showResult(focus = false): Promise<void> {
     cardReady = loadDesk(resultWindow, 'result');
   }
   await cardReady;
+  if (!stillNeeded()) return;
   resultWindow.setFocusable(focus);
   if (focus) resultWindow.show(); else resultWindow.showInactive();
   broadcast();
@@ -139,7 +140,7 @@ async function manualInput(signal: AbortSignal): Promise<string> {
       signal.addEventListener('abort', abort, { once: true });
       requestedInput = { resolve: value => { signal.removeEventListener('abort', abort); resolve(value); },
         reject: error => { signal.removeEventListener('abort', abort); reject(error); } };
-      void showResult(true).catch(reject);
+      void showResult(true, () => Boolean(requestedInput) && !signal.aborted).catch(reject);
     });
   } finally {
     requestedInput = null;
@@ -274,7 +275,12 @@ async function start(id: string, point?: Point, prepared?: Promise<RunTarget>): 
 }
 function presentError(error: unknown): void {
   const message = error instanceof Error ? error.message : 'failed';
-  if (runner.busy || starting) { void showResult(); return; }
+  if (runner.busy || starting) {
+    if (requestedInput) void showResult(true, () => Boolean(requestedInput));
+    else if (shouldShowRun(runner.state, runner.presentation))
+      void showResult(false, () => !requestedInput && shouldShowRun(runner.state, runner.presentation));
+    return;
+  }
   runner.state = { ...runner.state, status: 'failed', error: deskError(message, language()) };
   void showResult();
 }
@@ -379,11 +385,13 @@ void app.whenReady().then(async () => {
   context = new ContextClient({ command: helperPath('context-helper') });
   secrets = new SecretStore(join(store.dir, 'secrets.enc'), safeStorage);
   runner = new ActionRunner({ input, execute, publish: run => {
-    if (hideTimer) { clearTimeout(hideTimer); hideTimer = null; }
     if (run.error) runner.state.error = deskError(run.error, language());
     broadcast();
-    if (!requestedInput) void showResult();
-    if (run.status === 'completed' && !run.text && !run.image) hideTimer = setTimeout(() => resultWindow?.hide(), 1800);
+    if (!requestedInput) {
+      const needed = () => runner.state.id === run.id && !requestedInput && shouldShowRun(runner.state, runner.presentation);
+      if (needed()) void showResult(false, needed);
+      else resultWindow?.hide();
+    }
   } });
   surfaces = new DesktopSurfaces(mac, state, point => { origin = snapshot(point); void origin.catch(() => undefined); },
     (id, point) => { const prepared = origin; origin = null; void start(id, point, prepared ?? undefined).catch(presentError); });

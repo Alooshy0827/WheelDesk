@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { idleRun, validateWorkflow, type ActionDefinition, type ActionValue, type InputSource,
   type RunState, type WorkbenchSettings } from '../../shared/actions';
+import { presentationFor, type RunPresentation } from './presentation';
 
 export interface RunTarget { window: string; selection: string; x: number; y: number }
 export interface ExecutionContext {
@@ -17,6 +18,7 @@ export interface RunnerDeps {
 }
 export class ActionRunner {
   state = idleRun();
+  presentation: RunPresentation = { progress: false, result: false };
   private controller: AbortController | null = null;
   constructor(private readonly deps: RunnerDeps) {}
   get busy(): boolean { return this.controller !== null; }
@@ -33,6 +35,7 @@ export class ActionRunner {
     const flow = action.kind === 'workflow' ? snapshot.workflows.find(f => f.id === action.value) : undefined;
     if (action.kind === 'workflow' && (!flow || validateWorkflow(flow, snapshot).length)) throw new Error('workflowInvalid');
     const steps = flow?.steps ?? [{ id, actionId: id, input: action.input }];
+    this.presentation = presentationFor(action, snapshot.actions.find(a => a.id === steps.at(-1)?.actionId));
     const controller = new AbortController();
     this.controller = controller;
     this.state = { ...idleRun(), id: randomUUID(), name: action.name, status: 'running', total: steps.length };

@@ -251,6 +251,7 @@ app.whenReady().then(async () => {
   assert.equal(requests.length, 1); assert(!requests[0].tools); assert.equal(typeof requests[0].messages[1].content, 'string');
   const resultWin = await until(() => BrowserWindow.getAllWindows().find(w => w.webContents.getURL().includes('#result')), 'result window');
   await until(() => resultWin.webContents.executeJavaScript('document.body.innerText.includes("你好，WheelDesk。")'), 'rendered result');
+  await until(() => resultWin.isVisible(), 'AI result card remains visible');
   writeFileSync(join(smokeDir, 'result.png'), (await resultWin.webContents.capturePage()).toPNG());
   assert.equal((await resultWin.webContents.executeJavaScript('window.desk.invoke({type:"save",settings:{}})')).ok, false);
   assert.equal((await resultWin.webContents.executeJavaScript('window.desk.invoke({type:"key",id:"fixture",key:"not-stored"})')).ok, false);
@@ -260,9 +261,35 @@ app.whenReady().then(async () => {
   assert.equal((await invoke({ type: 'save', settings })).ok, true);
   assert.equal((await invoke({ type: 'run', id: 'smokeScript' })).ok, true);
   await until(async () => { const s = (await invoke({ type: 'state' })).state; return s.run.status === 'completed' && s.run.text === 'script-ok'; }, 'real script action');
+  // Observe real window show events, including short flashes during ordinary actions.
+  await resultWin.webContents.executeJavaScript('window.desk.invoke({type:"close"})');
+  let resultShows = 0;
+  resultWin.on('show', () => resultShows++);
+  const baseAction = { nameEn: '', input: 'none', value: '', windows: '', mac: '', profileId: '', timeoutS: 5, output: 'card' };
+  settings.workbench.actions.push(
+    { ...baseAction, id: 'quietSwitch', name: 'Quiet switch', kind: 'switchWheel', value: 'ai' },
+    { ...baseAction, id: 'quietDelay', name: 'Quiet delay', kind: 'delay', value: '300' },
+    { ...baseAction, id: 'visibleFailure', name: 'Visible failure', kind: 'openUrl', value: 'file:///invalid' },
+    { ...baseAction, id: 'manualPrompt', name: 'Manual prompt', kind: 'script', input: 'manual', mac: 'printf manual', windows: '[Console]::Write("manual")' },
+  );
+  assert.equal((await invoke({ type: 'save', settings })).ok, true);
+  for (const id of ['quietSwitch', 'quietDelay']) {
+    assert.equal((await invoke({ type: 'run', id })).ok, true);
+    const name = settings.workbench.actions.find(a => a.id === id).name;
+    await until(async () => { const run = (await invoke({type:'state'})).state.run; return run.name === name && run.status === 'completed'; }, id);
+    assert.equal(resultShows, 0, 'Ordinary actions must never flash the result window');
+    assert.equal(resultWin.isVisible(), false);
+  }
+  assert.equal((await invoke({ type: 'run', id: 'visibleFailure' })).ok, true);
+  await until(async () => (await invoke({type:'state'})).state.run.status === 'failed' && resultWin.isVisible(), 'necessary failure dialog');
+  await resultWin.webContents.executeJavaScript('window.desk.invoke({type:"close"})');
+  assert.equal((await invoke({ type: 'run', id: 'manualPrompt' })).ok, true);
+  await until(async () => (await invoke({type:'state'})).state.run.status === 'input' && resultWin.isVisible(), 'necessary input dialog');
+  await resultWin.webContents.executeJavaScript('window.desk.invoke({type:"cancel"})');
+  await until(async () => (await invoke({type:'state'})).state.run.status === 'cancelled' && !resultWin.isVisible(), 'cancel without another popup');
   assert.deepEqual(errors, []);
   writeFileSync(join(smokeDir, 'report.json'), JSON.stringify({ passed: true, helper: finished.helper,
-    checks: ['eight provider presets and persistence', 'real model test and localized auth error', 'save-and-test persists successful keys with mock keychain', 'failed replacement preserves saved key', 'advanced settings collapsed by default', 'model-test sender validation', '2–12 spokes through real settings UI', 'per-wheel spoke count persistence after reload', 'hidden function restoration', 'dynamic overlay hit alignment', 'settings mounts', 'upstream six-section navigation', 'original effect/function pairs move and autosave', 'empty function slots', '12 original effects', 'original collision/ring/bobbing animations', '12 sounds fetched and decoded', 'preview does not execute actions', 'original wheel geometry/hover/transition', 'custom function labels', 'idle overlay cleanup', 'light and dark themes', 'Chinese language', 'independent branding', 'model listing', 'text-only AI request', 'no AI tools', 'streamed result', 'usage', 'renderer IPC permissions', 'real script action'], rendererErrors: errors }, null, 2));
+    checks: ['eight provider presets and persistence', 'real model test and localized auth error', 'save-and-test persists successful keys with mock keychain', 'failed replacement preserves saved key', 'advanced settings collapsed by default', 'model-test sender validation', '2–12 spokes through real settings UI', 'per-wheel spoke count persistence after reload', 'hidden function restoration', 'dynamic overlay hit alignment', 'settings mounts', 'upstream six-section navigation', 'original effect/function pairs move and autosave', 'empty function slots', '12 original effects', 'original collision/ring/bobbing animations', '12 sounds fetched and decoded', 'preview does not execute actions', 'original wheel geometry/hover/transition', 'custom function labels', 'idle overlay cleanup', 'light and dark themes', 'Chinese language', 'independent branding', 'model listing', 'text-only AI request', 'no AI tools', 'streamed result', 'usage', 'renderer IPC permissions', 'real script action', 'ordinary actions never show result window', 'failure and manual input still show', 'cancellation stays hidden'], rendererErrors: errors }, null, 2));
   console.log('WheelDesk smoke passed', JSON.stringify({ helper: finished.helper }));
   server.close(); app.quit();
 }).catch(error => { console.error(error, errors); if (server) server.close(); app.exit(1); });

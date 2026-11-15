@@ -1,12 +1,12 @@
 # Validation / 验证记录
 
-Version: 0.1.6 internal beta. Host: Apple Silicon, macOS 26.6. Target: macOS 13+ Apple Silicon. Windows installer is deferred by request.
+Version: 0.1.7 internal beta. Host: Apple Silicon, macOS 26.6. Target: macOS 13+ Apple Silicon. Windows installer is deferred by request.
 
 ## Automated checks
 
 - `npm run typecheck`: passed.
 - `npm run test:helper`: 692 input assertions, 544 context assertions, 26 macOS callback assertions; all passed (1,262 total). The context tests include shortcut validation, held modifiers, target changes and elevated targets.
-- `npm test`: 136 files passed; 2,145 tests passed, 5 skipped. Includes automatic permission recovery after a grant, suppressing retry loops, failed probes and shutdown during a probe; provider preset persistence, credential clearing on endpoint changes, fixed text-only probes for both protocols, invalid configuration, authentication/rate/model/network/timeout/empty-response errors, plus every spoke count from 2 through 12, odd/even angular boundaries, rendered hit alignment at three scales, per-gesture count snapshots, hidden binding persistence/restoration, original-effect migration, moving effect/function pairs, preserving every binding when resetting replaced effects, gesture snapshots, one-shot dispatch, preview isolation, scaled hit testing, capture cleanup, local asset-origin boundaries, upstream regressions, configuration repair, workflow sequencing/failure/cancel/snapshots, actual scripts, provider fixtures and credential boundaries.
+- `npm test`: 137 files passed; 2,157 tests passed, 5 skipped. Includes automatic permission recovery after a grant, suppressing retry loops, failed probes and shutdown during a probe; provider preset persistence, credential clearing on endpoint changes, fixed text-only probes for both protocols, invalid configuration, authentication/rate/model/network/timeout/empty-response errors, plus every spoke count from 2 through 12, odd/even angular boundaries, rendered hit alignment at three scales, per-gesture count snapshots, hidden binding persistence/restoration, original-effect migration, moving effect/function pairs, preserving every binding when resetting replaced effects, gesture snapshots, one-shot dispatch, preview isolation, scaled hit testing, capture cleanup, local asset-origin boundaries, upstream regressions, configuration repair, workflow sequencing/failure/cancel/snapshots, actual scripts, provider fixtures and credential boundaries.
 - `npm run build`: passed.
 
 - Prior GitHub Actions: [initial cross-platform check](https://github.com/Alooshy0827/WheelDesk/actions/runs/43441701375) passed on both native platforms.
@@ -44,3 +44,12 @@ This is an internal beta, not a claim that every item in the original two-platfo
 - Built 0.1.6 with a changed app and hook-helper for an actual upgrade comparison. Full tests passed on this revision. Initial sandbox socket tests failed with EPERM; the complete rerun with local sockets allowed passed (2,145 tests).
 - With the user’s explicit permission and their Touch ID authentication, removed the stale Accessibility entry and added the canonical 0.1.5 app. It automatically recovered to “轮盘已开启” without clicking Retry. Upgraded to 0.1.6 without changing any privacy settings: the UI displayed version 0.1.6 and “轮盘已开启”, and the signed hook-helper remained running. The app and hook code hashes changed across this upgrade while all three designated requirements stayed identical. A further ordinary restart also showed version 0.1.6 and “轮盘已开启” without another permission step. This verifies Accessibility authorization preservation on this Mac.
 - Injected test shortcut events did not produce an observed toggle; physical gesture/input acceptance remains separate and is not claimed from a running helper alone.
+
+
+## Conditional result windows (0.1.7)
+
+- Regression tests cover silent system actions even when they return text, streamed AI card/copy/paste modes, workflow progress versus completion, and failures of silent actions.
+- Real Electron smoke tests passed with isolated configuration and a local model fixture (`smoke-data/quiet-017-final`). Observed actual window `show` events: wheel switching and waiting never opened or flashed the result card. AI output remained visible; errors and manual input still opened their dialogs; cancellation hid the card without reopening it. Native helper reported running. Existing model/UI/effect regression checks also passed.
+- Built and verified the DMG using the existing pinned certificate, backed up 0.1.6, and installed 0.1.7 in `/Applications/WheelDesk.app`. Temporary bundles were removed and Launch Services retained only the canonical application.
+
+- Installed 0.1.7 UI confirmed through the native accessibility tree: correct version and “轮盘已开启”; no Accessibility grant was changed for this update. The initial UI inspection timed out during startup, then succeeded once the input helper was running.
