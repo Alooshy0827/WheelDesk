@@ -1,8 +1,8 @@
 import { Button, Combobox, Dropdown, FluentProvider, Input, Option, Textarea, webDarkTheme, webLightTheme, motionTokens } from '@fluentui/react-components';
-import { Add24Regular, Apps24Regular, ArrowMove24Regular, ArrowSync24Regular, Copy24Regular, Cursor24Regular, DataPie24Regular, Delete24Regular, Info24Regular, LocalLanguage24Regular, Play24Regular, Power24Regular, Rocket24Regular, Settings24Regular, ShieldKeyhole24Regular, Sparkle24Regular, ResizeLarge24Regular, Timer24Regular, Speaker224Regular, SpeakerMute24Regular, MusicNote224Regular } from '@fluentui/react-icons';
+import { Add24Regular, Apps24Regular, ArrowSync24Regular, Copy24Regular, Cursor24Regular, DataPie24Regular, Delete24Regular, Info24Regular, LocalLanguage24Regular, Play24Regular, Power24Regular, Rocket24Regular, Settings24Regular, ShieldKeyhole24Regular, Sparkle24Regular, ResizeLarge24Regular, Timer24Regular, Speaker224Regular, SpeakerMute24Regular, MusicNote224Regular } from '@fluentui/react-icons';
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import type { DeskCommand, DeskReply, DeskState } from '../../shared/ipc';
-import { ACTION_KINDS, INPUT_SOURCES, defaultWorkbench, newAction, resizeWheel, setWheelEffects, validateWorkflow, type ActionDefinition, type ActionKind, type InputSource, type WorkbenchSettings } from '../../shared/actions';
+import { ACTION_KINDS, INPUT_SOURCES, hasPreparedInstruction, defaultWorkbench, newAction, resizeWheel, setWheelEffects, validateWorkflow, type ActionDefinition, type ActionKind, type InputSource, type WorkbenchSettings } from '../../shared/actions';
 import { WHEEL_SLOT_LIMITS } from '../../shared/geometry';
 import { applyModelPreset, DESK_PROVIDERS } from '../../shared/workbenchModels';
 import { keyboardTriggers, triggerLabel, type Settings, type TriggerKey } from '../../shared/settings';
@@ -49,6 +49,8 @@ export function SettingsApp() {
   const [wheelId, setWheelId] = useState(''), [actionId, setActionId] = useState(''), [flowId, setFlowId] = useState(''), [profileId, setProfileId] = useState('');
   const [key, setKey] = useState(''), [modelIds, setModelIds] = useState<string[]>([]);
   const [pending, setPending] = useState(false);
+  const [aiPending, setAiPending] = useState(false);
+  const aiBusy = useRef(false);
   const [modelOperation, setModelOperation] = useState('');
   const [keyVisible, setKeyVisible] = useState(false);
   const [modelQuery, setModelQuery] = useState('');
@@ -126,6 +128,31 @@ export function SettingsApp() {
   const flow = wb.workflows.find(f => f.id === flowId) ?? wb.workflows[0];
   const profile = wb.profiles.find(p => p.id === profileId) ?? wb.profiles[0];
   const patchAction = (patch: Partial<ActionDefinition>) => edit({ actions: wb.actions.map(a => a.id === action.id ? { ...a, ...patch } : a) });
+  const patchCustom = (patch: Partial<NonNullable<ActionDefinition['aiCustom']>>) => {
+    if (action.aiCustom) patchAction({ aiCustom: { ...action.aiCustom, ...patch } });
+  };
+  const createAI = (slot?: number) => {
+    const id = uid();
+    edit({ actions: [...wb.actions, { ...newAction(id, 'ai'), name: t.newAIAction, nameEn: t.newAIAction,
+      aiCustom: { description: '', source: '', instruction: '', feedback: '' } }],
+      ...(slot === undefined ? {} : { wheels: wb.wheels.map(w => w.id === wheel.id ? { ...w,
+        slots: w.slots.map((value, i) => i === slot ? id : value) } : w) }) });
+    setActionId(id); show('actions');
+  };
+  const prepareAI = async () => {
+    if (aiBusy.current || !action?.aiCustom) return;
+    aiBusy.current = true; setAiPending(true); notice(t.preparingAI);
+    try {
+      if (!await flush()) return;
+      notice(t.preparingAI);
+      const reply = await invoke({ type: 'prepareAI', id: action.id, regenerate: true });
+      if (reply.ok && reply.state) {
+        draftRef.current = structuredClone(reply.state.settings); setDraft(draftRef.current);
+        notice(t.aiReady);
+      }
+    } finally { aiBusy.current = false; setAiPending(false); }
+  };
+
   const patchFlow = (patch: Partial<typeof flow>) => edit({ workflows: wb.workflows.map(f => f.id === flow.id ? { ...f, ...patch } : f),
     ...(patch.name !== undefined ? { actions: wb.actions.map(a => a.kind === 'workflow' && a.value === flow.id ? { ...a, name: patch.name ?? '', nameEn: patch.name ?? '' } : a) } : {}) });
   const resetModelStatus = () => { modelRevision.current++; setModelStatus(null); setModelIds([]); setModelQuery(''); setKeyVisible(false); };
@@ -165,15 +192,14 @@ export function SettingsApp() {
       <div className="titlebar"><img src={logo} alt=""/>WheelDesk</div>
       <nav className="side" ref={nav}><span className="navBar" ref={bar}/><div className="brand"><img src={logo} alt=""/><div><b>WheelDesk</b><span className="desc">{t.subtitle}</span></div></div>
         {sectionIds.map((id, i) => <button key={id} data-section={id} className={`navItem${active === id ? ' sel' : ''}`} onClick={() => show(id)}>{navIcons[i]}{sectionNames[id]}</button>)}
-        <div className="wdSidebarFoot"><span className="desc">{t.about}</span><span role="status" className={failed ? 'wdError' : 'desc'}>{message}</span>{failed && <Button size="small" onClick={() => void flush()}>{t.save}</Button>}</div>
+        <div className="wdSidebarFoot"><span className="desc">{t.about}</span><span role="status" className={failed ? 'wdError' : 'desc'}>{message}</span>{aiPending && <Button size="small" onClick={() => void invoke({ type: 'cancelPrepareAI' })}>{t.cancel}</Button>}{failed && <Button disabled={aiPending} size="small" onClick={() => void flush()}>{t.save}</Button>}</div>
       </nav>
-      <main className="content" ref={main} onScroll={onScroll} onScrollEnd={() => { jumping.current = false; }}>
+      <main className="content" inert={aiPending} aria-busy={aiPending} ref={main} onScroll={onScroll} onScrollEnd={() => { jumping.current = false; }}>
         <h1 className="pageTitle">{upstream.pageTitle}</h1>
         {state.platform === 'mac' && state.helper === 'noAccess' && <div className="card permission"><span className="icon"><ShieldKeyhole24Regular/></span><div className="lbl"><b>{t.helperStates.noAccess}</b><p className="desc">{t.permissionsHint}</p><div className="wdButtons"><Button appearance="primary" onClick={() => void invoke({ type: 'accessibility' })}>{t.accessibility}</Button><Button onClick={() => void invoke({ type: 'retry' })}>{t.retry}</Button></div></div></div>}
         <div className="card status"><div className={`dot${state.helper === 'failed' || state.helper === 'noAccess' ? ' failed' : off ? ' off' : ''}`}/><img className="statusPing" src={logo} alt=""/><div className="lbl"><b>{state.helper === 'running' ? draft.enabledOnStart ? t.wheelEnabled : t.wheelDisabled : t.helperStates[state.helper]}</b><span className="desc">{t.wheelHelp}</span></div><OnOffSwitch checked={draft.enabledOnStart} onChange={enabledOnStart => changeSettings({ enabledOnStart })}/></div>
         <div className="section" id="trigger">{upstream.navTrigger}</div>
         <SettingRow icon={<Cursor24Regular/>} title={t.trigger} description={t.wheelHelp} dim={off}><Choice label={t.trigger} value={typeof draft.trigger === 'string' ? draft.trigger : 'custom'} options={[...keyboardTriggers(state.platform), 'mouse4', 'mouse5'].map(id => ({ id, name: triggerLabel(id as TriggerKey, state.lang, state.platform) }))} onChange={v => changeSettings({ trigger: v as TriggerKey })}/></SettingRow>
-        <SliderRow icon={<ArrowMove24Regular/>} limit="dragThresholdPx" title={upstream.dragDistance} description={upstream.dragDistanceDesc} value={draft.dragThresholdPx} format={v => `${v} ${state.platform === 'mac' ? 'pt' : 'px'}`} onChange={v => changeSettings({ dragThresholdPx: v })} dim={off}/>
         <SwitchRow icon={<Power24Regular/>} title={t.enabled} checked={draft.enabledOnStart} onChange={v => changeSettings({ enabledOnStart: v })}/>
         <div className="section" id="wheels">{t.wheels}</div>
         <SettingRow icon={<DataPie24Regular/>} title={t.wheels} description={t.wheelSlotsHelp}><Choice label={t.wheels} value={wheel.id} options={wb.wheels.map(w => ({ id: w.id, name: name(w) }))} onChange={setWheelId}/><Button icon={<Add24Regular/>} aria-label={t.newWheel} onClick={() => { const id = uid(); edit({ wheels: [...wb.wheels, { id, name: t.newWheel, nameEn: t.newWheel, slotCount: 8, slots: Array(8).fill(null), effects: [...DEFAULT_WHEEL], slotNames: Array(8).fill('') }] }); setWheelId(id); }}/></SettingRow>
@@ -200,6 +226,7 @@ export function SettingsApp() {
               <Choice label={`${slotLabels[i]} · ${t.action}`} value={wheel.slots[i] ?? ''}
                 options={[{ id: '', name: t.empty }, ...wb.actions.map(a => ({ id: a.id, name: name(a) }))]}
                 onChange={id => edit({ wheels: wb.wheels.map(w => w.id === wheel.id ? { ...w, slots: w.slots.map((v, j) => i === j ? id || null : v) } : w) })}/>
+              <Button size="small" appearance="subtle" icon={<Sparkle24Regular/>} onClick={() => createAI(i)}>{t.newAIAction}</Button>
             </div>
           </div>)}
         </div>
@@ -212,15 +239,31 @@ export function SettingsApp() {
           <SwitchRow icon={<MusicNote224Regular/>} title={upstream.tickSound} checked={draft.tickSound} onChange={tickSound => changeSettings({ tickSound })}/>
         </ExpanderRow>
         <div className="section" id="actions">{t.actions}</div>
-        <SettingRow icon={<Apps24Regular/>} title={t.actions} description={t.testHint}><Choice label={t.actions} value={action?.id ?? ''} options={wb.actions.map(a => ({ id: a.id, name: name(a) }))} onChange={setActionId}/><Button icon={<Add24Regular/>} aria-label={t.newAction} onClick={() => { const id = uid(); edit({ actions: [...wb.actions, { ...newAction(id, 'ai'), name: t.newAction, nameEn: t.newAction }] }); setActionId(id); }}/></SettingRow>
+        <SettingRow icon={<Apps24Regular/>} title={t.actions} description={t.testHint}><Choice label={t.actions} value={action?.id ?? ''} options={wb.actions.map(a => ({ id: a.id, name: name(a) }))} onChange={setActionId}/><Button icon={<Add24Regular/>} aria-label={t.newAction} onClick={() => createAI()}/></SettingRow>
         {action && <div className="card mate wdEditor" key={action.id}><div className="mateHead"><b>{name(action)}</b><Button icon={<Play24Regular/>} onClick={() => void run(action.id)}>{t.test}</Button><Button icon={<Delete24Regular/>} onClick={() => remove(() => edit({ actions: wb.actions.filter(a => a.id !== action.id) }))}>{t.remove}</Button></div>
           <EditField label={t.name}><Input value={action.name} maxLength={80} onChange={(_, d) => patchAction({ name: d.value })}/></EditField><EditField label={t.nameEn}><Input value={action.nameEn} maxLength={80} onChange={(_, d) => patchAction({ nameEn: d.value })}/></EditField>
           <EditField label={t.type}><Choice label={t.type} value={action.kind} options={ACTION_KINDS.map(id => ({ id, name: t.kind[id] }))} onChange={kind => patchAction({ ...newAction(action.id, kind as ActionKind), name: action.name, nameEn: action.nameEn })}/></EditField>
+          {action.kind === 'ai' && <EditField label={t.aiMode}><Choice label={t.aiMode} value={action.aiCustom ? 'custom' : 'direct'}
+            options={[{ id: 'custom', name: t.aiCustomMode }, { id: 'direct', name: t.aiDirectMode }]}
+            onChange={mode => patchAction({ aiCustom: mode === 'custom' ? { description: action.value, source: '', instruction: '', feedback: '' } : undefined })}/></EditField>}
           <EditField label={t.input}>{source(action.input, input => patchAction({ input }), false)}</EditField>
           {action.kind === 'switchWheel' ? <EditField label={t.wheels}><Choice label={t.wheels} value={action.value} options={[{ id: '', name: '—' }, ...wb.wheels.map(w => ({ id: w.id, name: name(w) }))]} onChange={value => patchAction({ value })}/></EditField>
             : action.kind === 'workflow' ? <EditField label={t.workflows}><Choice label={t.workflows} value={action.value} options={[{ id: '', name: '—' }, ...wb.workflows]} onChange={value => patchAction({ value })}/></EditField>
-            : !['script', 'screenshot', 'readClipboard'].includes(action.kind) && <EditField label={t.value} hint={action.kind === 'ai' ? t.promptHint : action.kind === 'shortcut' ? t.shortcutHint : undefined}><Textarea value={action.value} rows={action.kind === 'ai' ? 5 : 2} maxLength={20000} onChange={(_, d) => patchAction({ value: d.value })}/></EditField>}
+            : !action.aiCustom && !['script', 'screenshot', 'readClipboard'].includes(action.kind) && <EditField label={t.value} hint={action.kind === 'ai' ? t.promptHint : action.kind === 'shortcut' ? t.shortcutHint : undefined}><Textarea value={action.value} rows={action.kind === 'ai' ? 5 : 2} maxLength={20000} onChange={(_, d) => patchAction({ value: d.value })}/></EditField>}
           {['script', 'openApp', 'openPath'].includes(action.kind) && <><EditField label={t.windows} hint={action.kind === 'script' ? t.scriptHint : t.platformHint}><Textarea className="wdCode" value={action.windows} rows={action.kind === 'script' ? 5 : 2} maxLength={20000} onChange={(_, d) => patchAction({ windows: d.value })}/></EditField><EditField label={t.mac}><Textarea className="wdCode" value={action.mac} rows={action.kind === 'script' ? 5 : 2} maxLength={20000} onChange={(_, d) => patchAction({ mac: d.value })}/></EditField></>}
+          {action.kind === 'ai' && action.aiCustom && <>
+            <EditField label={t.aiDescription} hint={t.aiDescriptionHint}><Textarea aria-label={t.aiDescription} value={action.aiCustom.description} rows={4} maxLength={20000}
+              onChange={(_, d) => patchCustom({ description: d.value })}/></EditField>
+            <p role="status" className={hasPreparedInstruction(action.aiCustom) ? 'wdModelSuccess' : 'desc'}>
+              {hasPreparedInstruction(action.aiCustom) ? t.aiCached : action.aiCustom.instruction ? t.aiStale : t.aiUnprepared}</p>
+            <EditField label={t.aiUnderstanding} hint={t.aiUnderstandingHint}><Textarea aria-label={t.aiUnderstanding} value={action.aiCustom.instruction} rows={6} maxLength={20000}
+              onChange={(_, d) => patchCustom({ instruction: d.value, source: action.aiCustom?.description ?? '' })}/></EditField>
+            <EditField label={t.aiFeedback} hint={t.aiFeedbackHint}><Textarea aria-label={t.aiFeedback} value={action.aiCustom.feedback} rows={2} maxLength={4000}
+              onChange={(_, d) => patchCustom({ feedback: d.value })}/></EditField>
+            <div className="wdButtons"><Button appearance="primary" disabled={!action.aiCustom.description.trim()} onClick={() => void prepareAI()}>
+              {action.aiCustom.instruction ? t.aiRegenerate : t.aiGenerate}</Button></div>
+            <p className="desc">{t.aiCostHint}</p>
+          </>}
           {action.kind === 'ai' && <EditField label={t.model}><Choice label={t.model} value={action.profileId} options={[{ id: '', name: t.useDefault }, ...wb.profiles]} onChange={profileId => patchAction({ profileId })}/></EditField>}
           <EditField label={t.timeout}><Input type="number" min={1} max={1800} value={String(action.timeoutS)} onChange={(_, d) => patchAction({ timeoutS: Number(d.value) })}/></EditField>
           {['ai', 'script', 'screenshot'].includes(action.kind) && <EditField label={t.output}><Choice label={t.output} value={action.output} options={(['card', 'copy', 'paste'] as const).filter(o => action.kind !== 'screenshot' || o !== 'paste').map(id => ({ id, name: t.outputNames[id] }))} onChange={output => patchAction({ output: output as ActionDefinition['output'] })}/></EditField>}

@@ -345,6 +345,8 @@ export type DeskCommand =
   | { type: 'state' }
   | { type: 'save'; settings: unknown }
   | { type: 'run'; id: string }
+  | { type: 'prepareAI'; id: string; regenerate: boolean }
+  | { type: 'cancelPrepareAI' }
   | { type: 'cancel' }
   | { type: 'key'; id: string; key: string }
   | { type: 'check' | 'testModel'; id: string; key?: string }

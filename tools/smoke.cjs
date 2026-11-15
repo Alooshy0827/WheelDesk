@@ -91,8 +91,12 @@ app.whenReady().then(async () => {
     countWheels.set(count, (await invoke({type:'state'})).state.settings.workbench.wheels[0]);
   }
   async function setSlotName(index, value) {
+    win.show(); win.focus();
     const selector = `input[aria-label="位置 ${index + 1} · 自定义名称"]`;
+    await win.webContents.executeJavaScript(`document.querySelector(${JSON.stringify(selector)}).focus()`);
+    await win.webContents.executeJavaScript('new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))');
     await win.webContents.executeJavaScript(`(() => { const el = document.querySelector(${JSON.stringify(selector)}); el.focus(); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(el, ${JSON.stringify(value)}); el.dispatchEvent(new Event('input', {bubbles:true})); })()`);
+    await win.webContents.executeJavaScript('new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))');
     await win.webContents.executeJavaScript(`document.querySelector(${JSON.stringify(selector)}).blur()`);
     await until(async () => (await invoke({type:'state'})).state.settings.workbench.wheels[0].slotNames[index] === value, 'save custom slot name');
   }
@@ -209,8 +213,8 @@ app.whenReady().then(async () => {
       const physical = process.platform === 'darwin' ? point : screen.dipToScreenPoint(point);
       simulatedHook.stdin.write(JSON.stringify({type:'sim',ev,...physical,t:simTime += 20,...extra}) + '\n');
     };
-    sim('kdown',360,330,{vk:164}); sim('mdown',360,330,{btn:'left'}); sim('move',360,190);
-    await until(() => overlayJS('document.querySelector("#wheel").classList.contains("open")'), 'unbound wheel via production bridge');
+    sim('kdown',360,330,{vk:164}); sim('mdown',360,330,{btn:'left'});
+    await until(() => overlayJS('document.querySelector("#wheel").classList.contains("open")'), 'wheel opens on press before any mouse movement');
     sim('move',360,180);
     await until(() => overlayJS(`document.querySelector("#wheel .centerTxt").textContent === ${JSON.stringify(customSlotName)}`), 'custom name overrides unbound effect name');
     assert.equal(await overlayJS('document.querySelectorAll("#wheel .icon.dim").length'), 0);
@@ -231,6 +235,7 @@ app.whenReady().then(async () => {
 
   const requests = [];
   let probeStatus = 200;
+  let stallPreparation = false;
   const authHeaders = [];
   server = createServer(async (req, res) => {
     if (req.url === '/v1/models') { res.setHeader('Content-Type', 'application/json'); res.end(JSON.stringify({ data: [{ id: 'fixture-model' }] })); return; }
@@ -238,8 +243,10 @@ app.whenReady().then(async () => {
     if (probeStatus !== 200) { res.writeHead(probeStatus, {'Content-Type':'application/json'}); res.end(JSON.stringify({error:{message:'do-not-leak-draft-key'}})); return; }
     let text = ''; for await (const chunk of req) text += chunk;
     const body = JSON.parse(text); requests.push(body);
+    const preparing = body.messages[0]?.content.startsWith('Turn the user');
+    if (preparing && stallPreparation) return;
     res.setHeader('Content-Type', 'text/event-stream');
-    for (const delta of ['你好', '，WheelDesk。']) res.write(`data: ${JSON.stringify({ choices: [{ delta: { content: delta } }] })}\n\n`);
+    for (const delta of preparing ? ['提取三条中文要点，', '每条不超过十字。'] : ['你好', '，WheelDesk。']) res.write(`data: ${JSON.stringify({ choices: [{ delta: { content: delta } }] })}\n\n`);
     res.end(`data: ${JSON.stringify({ choices: [], usage: { prompt_tokens: 12, completion_tokens: 5 } })}\n\ndata: [DONE]\n\n`);
   });
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
@@ -350,9 +357,93 @@ app.whenReady().then(async () => {
   await until(async () => (await invoke({type:'state'})).state.run.status === 'input' && resultWin.isVisible(), 'necessary input dialog');
   await resultWin.webContents.executeJavaScript('window.desk.invoke({type:"cancel"})');
   await until(async () => (await invoke({type:'state'})).state.run.status === 'cancelled' && !resultWin.isVisible(), 'cancel without another popup');
+  // Create and bind a custom AI action through the actual settings controls.
+  await win.webContents.executeJavaScript(`document.querySelector('[data-section="wheels"]').click()`);
+  await win.webContents.executeJavaScript(`[...document.querySelectorAll('.wdBinding button')].find(b => b.textContent === '新建 AI 自定义动作').click()`);
+  const created = await until(async () => (await invoke({type:'state'})).state.settings.workbench.actions.find(a => a.aiCustom), 'new custom AI action saved');
+  assert((await invoke({type:'state'})).state.settings.workbench.wheels.some(w => w.slots.includes(created.id)));
+  async function editAI(label, value) {
+    const selector = `textarea[aria-label="${label}"]`;
+    await win.webContents.executeJavaScript(`(() => { const el = document.querySelector(${JSON.stringify(selector)}); Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set.call(el, ${JSON.stringify(value)}); el.dispatchEvent(new Event('input', {bubbles:true})); })()`);
+    await until(async () => {
+      const a = (await invoke({type:'state'})).state.settings.workbench.actions.find(a => a.id === created.id);
+      return a.aiCustom[{'动作描述':'description','已保存的理解':'instruction','改进意见':'feedback'}[label]] === value;
+    }, `save ${label}`);
+  }
+  const customState = async () => (await invoke({type:'state'})).state.settings.workbench.actions.find(a => a.id === created.id).aiCustom;
+  const clickAI = text => win.webContents.executeJavaScript(`[...document.querySelector('textarea[aria-label="动作描述"]').closest('.wdEditor').querySelectorAll('button')].find(b => b.textContent === ${JSON.stringify(text)}).click()`);
+  await editAI('动作描述', '把每次输入整理成三条中文要点');
+  let count = requests.length;
+  await clickAI('生成理解');
+  await until(async () => (await customState()).source === '把每次输入整理成三条中文要点', 'save generated understanding');
+  await until(() => win.webContents.executeJavaScript('!document.querySelector(".content").inert'), 'preparation completed');
+  assert.equal(requests.length, count + 1);
+  assert(!requests.at(-1).tools);
+  assert(!JSON.stringify(requests.at(-1)).includes('image_url'));
+  assert.equal((await overlayJS(`window.desk.invoke({type:'prepareAI',id:${JSON.stringify(created.id)},regenerate:true})`)).ok, false);
+  assert.equal((await resultWin.webContents.executeJavaScript(`window.desk.invoke({type:'prepareAI',id:${JSON.stringify(created.id)},regenerate:true})`)).ok, false);
+  await editAI('已保存的理解', '我修改的理解：只输出三条中文短句。');
+  let customSettings = (await invoke({type:'state'})).state.settings;
+  customSettings.workbench.actions.find(a => a.id === created.id).input = 'none';
+  assert.equal((await invoke({type:'save',settings:customSettings})).ok, true);
+  async function runCustom() {
+    const previous = (await invoke({type:'state'})).state.run.id;
+    assert.equal((await invoke({type:'run',id:created.id})).ok, true);
+    return until(async () => { const r = (await invoke({type:'state'})).state.run; return r.id !== previous && r.status === 'completed' ? r : null; }, 'custom AI execution', 20000);
+  }
+  count = requests.length;
+  await runCustom(); await runCustom();
+  assert.equal(requests.length, count + 2, 'cached runs each make only the execution request');
+  assert.equal(requests.at(-1).messages[0].content, '我修改的理解：只输出三条中文短句。');
+  await new Promise(resolve => { win.webContents.once('did-finish-load', resolve); win.webContents.reload(); });
+  await until(() => win.webContents.executeJavaScript('Boolean(document.querySelector(".pageTitle"))'), 'reload custom AI');
+  count = requests.length;
+  assert.equal((await invoke({type:'prepareAI',id:created.id,regenerate:false})).ok, true);
+  assert.equal(requests.length, count, 'persisted interpretation survives renderer reload');
+  await win.webContents.executeJavaScript(`document.querySelector('[role="combobox"][aria-label="动作库"]').click()`);
+  await until(() => win.webContents.executeJavaScript('Boolean(document.querySelector("[role=option]"))'), 'custom action choices');
+  await win.webContents.executeJavaScript(`[...document.querySelectorAll('[role="option"]')].find(o => o.textContent === '新建 AI 自定义动作').click()`);
+  await until(() => win.webContents.executeJavaScript(`Boolean(document.querySelector('textarea[aria-label="动作描述"]'))`), 'custom action editor restored');
+  assert.equal(await win.webContents.executeJavaScript(`document.querySelector('textarea[aria-label="已保存的理解"]').value`), '我修改的理解：只输出三条中文短句。');
+  await editAI('动作描述', '整理成三条中文要点，每条不超过十字');
+  count = requests.length;
+  const firstCustom = await runCustom();
+  assert.equal(requests.length, count + 2, 'changed descriptions prepare once then execute');
+  assert.equal(firstCustom.inputTokens, 24);
+  assert.equal((await customState()).source, '整理成三条中文要点，每条不超过十字');
+  await editAI('改进意见', '保留关键数字');
+  count = requests.length;
+  await clickAI('重新理解');
+  await until(() => win.webContents.executeJavaScript('!document.querySelector(".content").inert'), 'revision completed');
+  assert.equal(requests.length, count + 1);
+  assert.equal(JSON.parse(requests.at(-1).messages[1].content).feedback, '保留关键数字');
+  assert(JSON.parse(requests.at(-1).messages[1].content).previousInstruction);
+  const beforeFailure = await customState();
+  probeStatus = 401;
+  await clickAI('重新理解');
+  await until(() => win.webContents.executeJavaScript('document.querySelector(".wdSidebarFoot").innerText.includes("API 密钥验证失败")'), 'preparation auth failure');
+  assert.deepEqual(await customState(), beforeFailure);
+  probeStatus = 200; stallPreparation = true;
+  count = requests.length;
+  await clickAI('重新理解');
+  await until(() => requests.length > count, 'pending interpretation');
+  await win.webContents.executeJavaScript(`[...document.querySelectorAll('.wdSidebarFoot button')].find(b => b.textContent === '取消').click()`);
+  await until(() => win.webContents.executeJavaScript('!document.querySelector(".content").inert'), 'cancel preparation');
+  assert.deepEqual(await customState(), beforeFailure);
+  stallPreparation = false;
+  await win.webContents.executeJavaScript(`document.querySelector('textarea[aria-label="动作描述"]').scrollIntoView({block:'start',behavior:'instant'})`);
+  writeFileSync(join(smokeDir, 'custom-ai.png'), (await win.webContents.capturePage()).toPNG());
   assert.deepEqual(errors, []);
   writeFileSync(join(smokeDir, 'report.json'), JSON.stringify({ passed: true, simulatedGestures: Boolean(simulatedHook), helper: finished.helper,
-    checks: ['eight provider presets and persistence', 'real model test and localized auth error', 'save-and-test persists successful keys with mock keychain', 'failed replacement preserves saved key', 'advanced settings collapsed by default', 'model-test sender validation', '2–12 spokes through real settings UI', 'per-wheel spoke count persistence after reload', 'hidden function restoration', 'dynamic overlay hit alignment', 'settings mounts', 'upstream six-section navigation', 'original effect/function pairs move and autosave', 'empty function slots', '12 original effects', 'original collision/ring/bobbing animations', '12 sounds fetched and decoded', 'preview does not execute actions', 'original wheel geometry/hover/transition', 'custom function labels', 'idle overlay cleanup', 'light and dark themes', 'Chinese language', 'independent branding', 'model listing', 'text-only AI request', 'no AI tools', 'streamed result', 'usage', 'renderer IPC permissions', 'real script action', 'custom slot names persist across reload and resizing', 'custom names appear as text in wheel and effect', 'ordinary actions never show result window', 'failure and manual input still show', 'cancellation stays hidden'], rendererErrors: errors }, null, 2));
+    checks: ['wheel opens on press before movement', 'create and bind custom AI through UI', 'prepare/cache/edit/regenerate AI instructions', 'description change prepares once', 'cancel or failed interpretation preserves previous instruction', 'AI interpretation sender validation', 'eight provider presets and persistence', 'real model test and localized auth error', 'save-and-test persists successful keys with mock keychain', 'failed replacement preserves saved key', 'advanced settings collapsed by default', 'model-test sender validation', '2–12 spokes through real settings UI', 'per-wheel spoke count persistence after reload', 'hidden function restoration', 'dynamic overlay hit alignment', 'settings mounts', 'upstream six-section navigation', 'original effect/function pairs move and autosave', 'empty function slots', '12 original effects', 'original collision/ring/bobbing animations', '12 sounds fetched and decoded', 'preview does not execute actions', 'original wheel geometry/hover/transition', 'custom function labels', 'idle overlay cleanup', 'light and dark themes', 'Chinese language', 'independent branding', 'model listing', 'text-only AI request', 'no AI tools', 'streamed result', 'usage', 'renderer IPC permissions', 'real script action', 'custom slot names persist across reload and resizing', 'custom names appear as text in wheel and effect', 'ordinary actions never show result window', 'failure and manual input still show', 'cancellation stays hidden'], rendererErrors: errors }, null, 2));
   console.log('WheelDesk smoke passed', JSON.stringify({ helper: finished.helper }));
   server.close(); app.quit();
-}).catch(error => { console.error(error, errors); if (server) server.close(); app.exit(1); });
+}).catch(async error => {
+  console.error(error, errors);
+  const failed = BrowserWindow.getAllWindows().find(w => w.webContents.getURL().includes('#settings'));
+  if (failed) {
+    writeFileSync(join(smokeDir, 'failure.png'), (await failed.webContents.capturePage()).toPNG());
+    console.error(await failed.webContents.executeJavaScript(`JSON.stringify({inert:document.querySelector('.content')?.inert,active:document.activeElement?.outerHTML.slice(0,150),status:document.querySelector('.wdSidebarFoot')?.innerText,inputs:[...document.querySelectorAll('.wdBinding input')].map(e=>({value:e.value,disabled:e.disabled}))})`));
+  }
+  if (server) server.close(); app.exit(1);
+});

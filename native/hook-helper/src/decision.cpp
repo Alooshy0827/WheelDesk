@@ -540,6 +540,10 @@ void Decision::onMouseDown(const InputEvent& e, Result& r) {
     dragBtn_ = e.btn;
     px_ = e.x;
     py_ = e.y;
+    if (cfg_.openOnPress && owner_ == WheelKind::Ping) {
+      state_ = State::Wheel;
+      r.emits.push_back(point(Emit::Kind::WheelOpen, px_, py_, owner_));
+    }
   }
 }
 

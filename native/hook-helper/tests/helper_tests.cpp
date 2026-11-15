@@ -1939,7 +1939,52 @@ static void test_mac_option_drag_through_transitions() {
   CHECK(findEmit(r, Emit::Kind::WheelOpen) != nullptr);
 }
 
+static void test_wheeldesk_opens_on_press() {
+  Config cfg;
+  cfg.openOnPress = true;
+  CHECK(parseCommand(R"({"type":"config","openOnPress":true})", Config{}).config.openOnPress);
+  Decision d;
+  d.setConfig(cfg);
+  CHECK(!d.onEvent(md(Btn::Left, 30, 40)).swallow);
+  CHECK(!d.onEvent(mu(Btn::Left, 30, 40)).swallow);
+  d.onEvent(kd(ALT));
+  const auto down = d.onEvent(md(Btn::Left, 100, 200));
+  CHECK(down.swallow && down.injects.empty());
+  const auto* open = findEmit(down, Emit::Kind::WheelOpen);
+  CHECK(open && open->x == 100 && open->y == 200);
+  CHECK(d.state() == S::Wheel);
+  CHECK(!findEmit(d.onEvent(mv(100, 199)), Emit::Kind::WheelOpen));
+  CHECK(findEmit(d.onEvent(mv(100, 150)), Emit::Kind::WheelMove));
+  const auto release = d.onEvent(mu(Btn::Left, 100, 150));
+  CHECK(release.swallow && findEmit(release, Emit::Kind::WheelRelease));
+  CHECK(!findEmit(d.onEvent(mu(Btn::Left, 100, 150)), Emit::Kind::WheelRelease));
+  d.onEvent(ku(ALT));
+  // A stationary press opens and then releases at the center, without replaying a click.
+  d.onEvent(kd(ALT));
+  CHECK(findEmit(d.onEvent(md(Btn::Left, 1, 2)), Emit::Kind::WheelOpen));
+  const auto center = d.onEvent(mu(Btn::Left, 1, 2));
+  CHECK(center.swallow && center.injects.empty() && findEmit(center, Emit::Kind::WheelRelease));
+  // Esc and right-click retain the paired-up cancellation behavior.
+  d.onEvent(md(Btn::Left, 1, 2));
+  CHECK(findEmit(d.onEvent(kd(ESC)), Emit::Kind::Cancel));
+  CHECK(d.onEvent(mu(Btn::Left, 1, 2)).swallow);
+  d.onEvent(ku(ESC));
+  d.onEvent(md(Btn::Left, 1, 2));
+  CHECK(findEmit(d.onEvent(md(Btn::Right, 1, 2)), Emit::Kind::Cancel));
+  CHECK(d.onEvent(mu(Btn::Right, 1, 2)).swallow);
+  CHECK(d.onEvent(mu(Btn::Left, 1, 2)).swallow);
+  d.onEvent(ku(ALT));
+  // Other shortcuts and disabled input are untouched.
+  d.onEvent(kd(ALT)); d.onEvent(kd(TAB));
+  CHECK(!d.onEvent(md(Btn::Left, 1, 2)).swallow);
+  d.onEvent(mu(Btn::Left, 1, 2)); d.onEvent(ku(TAB)); d.onEvent(ku(ALT));
+  d.setEnabled(false); d.onEvent(kd(ALT));
+  CHECK(!d.onEvent(md(Btn::Left, 1, 2)).swallow);
+  CHECK(!d.onEvent(mu(Btn::Left, 1, 2)).swallow);
+}
+
 int main() {
+  test_wheeldesk_opens_on_press();
   test_json_parses_flat_objects();
   test_json_rejects_bad_input();
   test_json_escape();

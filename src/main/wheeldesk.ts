@@ -9,7 +9,7 @@ import { InputBridge } from './inputBridge';
 import { configCommand, type HelperEvent } from '../shared/protocol';
 import { deskError, deskText, resolveLang } from '../shared/i18n';
 import { normalizeSettings, type Settings } from '../shared/settings';
-import { normalizeWorkbench, parseShortcut, type ActionDefinition, type ActionValue, type InputSource } from '../shared/actions';
+import { hasPreparedInstruction, normalizeWorkbench, parseShortcut, type ActionDefinition, type ActionValue, type InputSource } from '../shared/actions';
 import { DESK_CH, type DeskReply, type DeskState, type Point } from '../shared/ipc';
 import { ContextClient } from './teammate/contextClient';
 import { SecretStore } from './teammate/secrets';
@@ -22,6 +22,7 @@ import { registerDeskScheme, serveDeskScheme } from './workbench/protocol';
 import { isPingId } from '../shared/pings';
 import { checkInputAccess, PermissionRecovery } from './workbench/permissionRecovery';
 import { shouldShowRun } from './workbench/presentation';
+import { actionProfile, applyPreparedInstruction, prepareInstruction } from './workbench/aiInstructions';
 
 const mac = process.platform === 'darwin';
 const platform = mac ? 'mac' : 'win';
@@ -46,6 +47,7 @@ let target: RunTarget = { window: '', selection: '', x: 0, y: 0 };
 let origin: Promise<RunTarget> | null = null;
 let requestedInput: { resolve: (text: string) => void; reject: (error: Error) => void } | null = null;
 let starting = false;
+let preparation: AbortController | null = null;
 let cardReady: Promise<void> | null = null;
 const helperPath = (name: string) => app.isPackaged ? mac ? join(process.resourcesPath, '../Helpers', name) : join(process.resourcesPath, name + '.exe')
   : join(app.getAppPath(), 'native/hook-helper/build', name + (mac ? '' : '.exe'));
@@ -99,8 +101,8 @@ async function showResult(focus = false, stillNeeded: () => boolean = () => true
 function configure(): void {
   const settings = store.get();
   // The native gesture channel stays compatible; only its primary wheel is used in WheelDesk.
-  bridge.send(configCommand({ ...settings, emoteTrigger: 'off', clickPing: false,
-    features: { ...settings.features, emotes: false, rooms: false, teammate: false } }, settings.enabledOnStart));
+  bridge.send({ ...configCommand({ ...settings, emoteTrigger: 'off', clickPing: false,
+    features: { ...settings.features, emotes: false, rooms: false, teammate: false } }, settings.enabledOnStart), openOnPress: true });
   if (app.isPackaged && app.getLoginItemSettings().openAtLogin !== settings.launchAtStartup)
     app.setLoginItemSettings({ openAtLogin: settings.launchAtStartup, args: ['--hidden'] });
   tray?.setContextMenu(Menu.buildFromTemplate([
@@ -191,6 +193,27 @@ async function fill(text: string, at: RunTarget, signal: AbortSignal): Promise<v
   if (!reply.restored) throw new Error('restore');
   at.selection = '';
 }
+async function instructionFor(action: ActionDefinition, ctx: Pick<ExecutionContext, 'settings' | 'signal' | 'usage'>, regenerate = false): Promise<string> {
+  if (!action.aiCustom) return action.value;
+  if (!regenerate && hasPreparedInstruction(action.aiCustom)) return action.aiCustom.instruction;
+  if (preparation) throw new Error('busy');
+  const controller = new AbortController();
+  preparation = controller;
+  const signal = AbortSignal.any([ctx.signal, controller.signal]);
+  try {
+    const profile = actionProfile(action, ctx.settings);
+    const prepared = await prepareInstruction(action, profile, secrets.key(profile.id) ?? '', signal, regenerate, ctx.usage);
+    signal.throwIfAborted();
+    const next = applyPreparedInstruction(store.get().workbench, ctx.settings, action, prepared);
+    const problems = store.problems.length;
+    store.update({ workbench: next });
+    await store.flush();
+    if (store.problems.length > problems) throw new Error('saveFailed');
+    // Repeated references in this workflow share the successful preparation as well.
+    action.aiCustom = prepared;
+    return prepared.instruction;
+  } finally { if (preparation === controller) preparation = null; }
+}
 async function execute(action: ActionDefinition, value: ActionValue, ctx: ExecutionContext): Promise<ActionValue> {
   ctx.signal.throwIfAborted();
   const text = value.text ?? action.value;
@@ -229,12 +252,12 @@ async function execute(action: ActionDefinition, value: ActionValue, ctx: Execut
     case 'script': output = { text: await runScript(mac ? action.mac : action.windows, value.text ?? '', mac, ctx.signal) }; break;
     case 'ai': {
       const wb = ctx.settings;
-      const profile = wb.profiles.find(p => p.id === (action.profileId || wb.defaultProfileId));
-      if (!profile || !profile.model) throw new Error('modelMissing');
+      const profile = actionProfile(action, wb);
+      const prompt = await instructionFor(action, ctx);
       const key = secrets.key(profile.id) ?? '';
       const parts: Part[] = [];
-      const instruction = action.value.includes('{{input}}') ? action.value.split('{{input}}').join(value.text ?? '') : action.value;
-      if (value.text && !action.value.includes('{{input}}')) parts.push({ text: value.text });
+      const instruction = prompt.includes('{{input}}') ? prompt.split('{{input}}').join(value.text ?? '') : prompt;
+      if (value.text && !prompt.includes('{{input}}')) parts.push({ text: value.text });
       if (value.image) parts.push({ image: { mime: value.image.mime, data: Buffer.from(value.image.data, 'base64') } });
       if (!parts.length) parts.push({ text: instruction });
       try {
@@ -259,7 +282,7 @@ async function execute(action: ActionDefinition, value: ActionValue, ctx: Execut
   return output;
 }
 async function start(id: string, point?: Point, prepared?: Promise<RunTarget>): Promise<void> {
-  if (runner.busy || starting) throw new Error('busy');
+  if (runner.busy || starting || preparation) throw new Error('busy');
   starting = true;
   try {
     if (!point) {
@@ -317,12 +340,22 @@ async function handle(sender: Electron.WebContents, raw: unknown): Promise<DeskR
     }
     case 'run': {
       if (!isSettings || typeof raw.id !== 'string') return { ok: false };
-      if (runner.busy || starting) throw new Error('busy');
+      if (runner.busy || starting || preparation) throw new Error('busy');
       const id = raw.id;
       starting = true;
       setTimeout(() => { starting = false; void start(id).catch(presentError); }, 3000);
       return { ok: true };
     }
+    case 'prepareAI': {
+      if (!isSettings || typeof raw.id !== 'string' || typeof raw.regenerate !== 'boolean') return { ok: false };
+      if (runner.busy || starting || preparation) throw new Error('busy');
+      const snapshot = structuredClone(store.get().workbench);
+      const action = snapshot.actions.find(a => a.id === raw.id);
+      if (!action || action.kind !== 'ai' || !action.aiCustom) throw new Error('missing');
+      await instructionFor(action, { settings: snapshot, signal: AbortSignal.timeout(action.timeoutS * 1000), usage: () => undefined }, raw.regenerate);
+      return { ok: true, state: state() };
+    }
+    case 'cancelPrepareAI': if (!isSettings) return { ok: false }; preparation?.abort(); return { ok: true };
     case 'cancel': runner.cancel(); return { ok: true };
     case 'key': {
       if (!isSettings || typeof raw.id !== 'string' || typeof raw.key !== 'string' || raw.key.length > 8192
@@ -374,7 +407,7 @@ app.on('before-quit', event => {
   if (quitting || !bridge) return;
   event.preventDefault(); quitting = true;
   permissionRecovery?.dispose();
-  runner.cancel(); surfaces.destroy();
+  runner.cancel(); preparation?.abort(); surfaces.destroy();
   void Promise.all([bridge.stop(), context.stop(), store.flush()]).finally(() => app.quit());
 });
 void app.whenReady().then(async () => {

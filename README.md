@@ -1,8 +1,8 @@
 # WheelDesk
 
-[简体中文](README.zh-CN.md) · Internal beta 0.1.9
+[简体中文](README.zh-CN.md) · Internal beta 0.1.10
 
-A desktop action wheel for everyday tools, AI instructions, and local workflows. Hold Alt (Option on macOS), drag, and release on an action. Move back into the center, press Escape, or right-click to cancel.
+A desktop action wheel for everyday tools, AI instructions, and local workflows. Hold Alt (Option on macOS) and press the left mouse button to show the wheel immediately. Move to an action and release the mouse button. Move back into the center, press Escape, or right-click to cancel.
 
 Based on [lolPing](https://github.com/darrenprx/lolPing), revision `c97fe772b98514b83f011ee540601faabd066d23`. The MIT license and original attribution are preserved. The original ping-wheel textures, sounds and animation code are reused; their separate Riot Games attribution remains in LICENSE and NOTICE.md. Emotes and room features are not included.
 
@@ -68,3 +68,7 @@ The repository retains upstream source modules and regression tests to preserve 
 macOS packaging requires the original private signing identity. Hosted Actions deliberately fails macOS packaging until that identity is securely provisioned; never bypass this with ad-hoc signing. See [signing setup and backup](docs/wheeldesk.md#stable-macos-update-identity).
 
 Ordinary system actions run without a result popup. AI and scripts respect their output mode; workflows retain progress and cancellation. Input requests and failures still display the required dialog.
+
+### Custom AI actions
+
+Use **New custom AI action** under any wheel position to create and bind an action, or add one in the action library. Describe the task and select its input, model and output. Generate the understanding now, or let the first run prepare and save it. Unchanged descriptions reuse that instruction across restarts; processing new input still calls the model. Edit the saved understanding directly, or provide revision feedback and regenerate. Changing the description invalidates the old preparation. Cancelled or failed requests preserve the previous content. Built-in actions retain direct-prompt mode.

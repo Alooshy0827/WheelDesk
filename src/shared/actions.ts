@@ -9,6 +9,15 @@ export type ActionKind = 'shortcut' | 'openApp' | 'openPath' | 'openUrl' | 'read
 export const ACTION_KINDS: readonly ActionKind[] = ['shortcut', 'openApp', 'openPath', 'openUrl', 'readClipboard',
   'writeClipboard', 'pasteText', 'screenshot', 'ai', 'script', 'delay', 'switchWheel', 'workflow'];
 export const INPUT_SOURCES: readonly InputSource[] = ['none', 'selection', 'clipboard', 'manual', 'screenshot', 'previous'];
+export interface AiCustomInstruction {
+  description: string;
+  /** The exact description this reusable instruction was prepared for. */
+  source: string;
+  instruction: string;
+  feedback: string;
+}
+export const hasPreparedInstruction = (custom: AiCustomInstruction): boolean =>
+  Boolean(custom.description.trim() && custom.instruction.trim() && custom.source === custom.description);
 export interface ActionDefinition {
   id: string;
   name: string;
@@ -19,6 +28,7 @@ export interface ActionDefinition {
   windows: string;
   mac: string;
   profileId: string;
+  aiCustom?: AiCustomInstruction;
   timeoutS: number;
   output: 'card' | 'copy' | 'paste';
 }
@@ -140,6 +150,11 @@ export function normalizeWorkbench(raw: unknown): WorkbenchSettings {
     if (!obj(v) || !ACTION_KINDS.includes(v.kind as ActionKind) || !idOf(v.id)) return [];
     return [{ id: idOf(v.id), name: str(v.name, 80), nameEn: str(v.nameEn, 80), kind: v.kind as ActionKind,
       input: inputOf(v.input), value: str(v.value),
+      ...(v.kind === 'ai' && obj(v.aiCustom) ? { aiCustom: {
+        description: str(v.aiCustom.description), source: str(v.aiCustom.source),
+        instruction: typeof v.aiCustom.instruction === 'string' && v.aiCustom.instruction.length <= 20000 ? v.aiCustom.instruction : '',
+        feedback: str(v.aiCustom.feedback, 4000),
+      } } : {}),
       windows: v.kind === 'script' ? scriptSource(v.windows) : str(v.windows),
       mac: v.kind === 'script' ? scriptSource(v.mac) : str(v.mac),
       profileId: idOf(v.profileId), timeoutS: typeof v.timeoutS === 'number' && Number.isFinite(v.timeoutS)

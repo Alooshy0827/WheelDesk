@@ -1,12 +1,12 @@
 # Validation / 验证记录
 
-Version: 0.1.9 internal beta. Host: Apple Silicon, macOS 26.6. Target: macOS 13+ Apple Silicon. Windows installer is deferred by request.
+Version: 0.1.10 internal beta. Host: Apple Silicon, macOS 26.6. Target: macOS 13+ Apple Silicon. Windows installer is deferred by request.
 
 ## Automated checks
 
 - `npm run typecheck`: passed.
-- `npm run test:helper`: 692 input assertions, 544 context assertions, 26 macOS callback assertions; all passed (1,262 total). The context tests include shortcut validation, held modifiers, target changes and elevated targets.
-- `npm test`: 137 files passed; 2,162 tests passed, 5 skipped. Includes automatic permission recovery after a grant, suppressing retry loops, failed probes and shutdown during a probe; provider preset persistence, credential clearing on endpoint changes, fixed text-only probes for both protocols, invalid configuration, authentication/rate/model/network/timeout/empty-response errors, plus every spoke count from 2 through 12, odd/even angular boundaries, rendered hit alignment at three scales, per-gesture count snapshots, hidden binding persistence/restoration, original-effect migration, moving effect/function pairs, preserving every binding when resetting replaced effects, gesture snapshots, one-shot dispatch, preview isolation, scaled hit testing, capture cleanup, local asset-origin boundaries, upstream regressions, configuration repair, workflow sequencing/failure/cancel/snapshots, actual scripts, provider fixtures and credential boundaries.
+- `npm run test:helper`: 712 input assertions, 544 context assertions, 26 macOS callback assertions; all passed (1,282 total). The context tests include shortcut validation, held modifiers, target changes and elevated targets.
+- `npm test`: 138 files passed; 2,174 tests passed, 5 skipped. Includes automatic permission recovery after a grant, suppressing retry loops, failed probes and shutdown during a probe; provider preset persistence, credential clearing on endpoint changes, fixed text-only probes for both protocols, invalid configuration, authentication/rate/model/network/timeout/empty-response errors, plus every spoke count from 2 through 12, odd/even angular boundaries, rendered hit alignment at three scales, per-gesture count snapshots, hidden binding persistence/restoration, original-effect migration, moving effect/function pairs, preserving every binding when resetting replaced effects, gesture snapshots, one-shot dispatch, preview isolation, scaled hit testing, capture cleanup, local asset-origin boundaries, upstream regressions, configuration repair, workflow sequencing/failure/cancel/snapshots, actual scripts, provider fixtures and credential boundaries.
 - `npm run build`: passed.
 
 - Prior GitHub Actions: [initial cross-platform check](https://github.com/Alooshy0827/WheelDesk/actions/runs/43441701375) passed on both native platforms.
@@ -70,3 +70,15 @@ This is an internal beta, not a claim that every item in the original two-platfo
 - Visually inspected the settings screenshot: per-position name inputs and action selectors are visible in the original grouped settings card. No user configuration or API keys were used in these tests.
 
 - The 0.1.9 DMG passed checksum and fixed-identity signature checks. Backed up and replaced 0.1.8 at the canonical path, retaining existing user configuration. Temporary app bundles were removed, and Launch Services reported only `/Applications/WheelDesk.app`.
+
+
+## Immediate opening and custom AI actions (0.1.10)
+
+- Typecheck, native checks (712 input + 544 context + 26 macOS callback assertions), 138 JavaScript test files / 2,174 passing tests (5 skipped), and production build passed.
+- Native input checks cover opening on the claimed button-down without movement, center release with no click replay, one release dispatch, Esc/right-click cancellation, foreign shortcut passthrough and paused input. The original threshold-based upstream path remains covered by its existing tests.
+- Real Electron smoke passed with isolated data and local models (`smoke-data/custom-ai-010-d`): the production bridge/overlay opens after native simulated button-down before any move; unbound original effects and independent names still work. The test foregrounds its settings window before checking blur-save fields.
+- Created and bound a custom AI action using its real per-slot button. Generated an understanding, edited it, executed it twice with exactly one request per run, reloaded settings and verified no preparation request, changed the description and observed exactly one preparation plus execution, then revised with feedback. Verified no image or tools in preparation, settings-only IPC, cancellation and auth failure preserving the previous understanding, and combined token usage. No private keys or external services were used.
+- Inspected the custom-action settings screenshot. Original grouped Fluent layout is retained. AI execution is content-only; generated instructions cannot start system commands.
+- Live provider requests with user credentials, Windows physical input and mixed-display hardware remain outside this test run.
+
+- The 0.1.10 DMG passed checksum and pinned-signature verification. Backed up 0.1.9 and atomically replaced the canonical app; existing user settings were retained. Installed UI shows 0.1.10, Option trigger and the running input helper without a new authorization. Generated app copies were removed; Launch Services contains only `/Applications/WheelDesk.app`. Native event sequencing above was validated with the simulator; the UI screenshot does not establish physical hold timing.

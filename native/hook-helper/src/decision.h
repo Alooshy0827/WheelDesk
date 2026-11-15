@@ -35,6 +35,7 @@ struct Config {
   Trigger trigger = Trigger::Alt;  // the ping wheel's
   uint32_t triggerVk = 0;          // only for Trigger::CustomVk
   bool clickPing = false;
+  bool openOnPress = false;  // WheelDesk: primary wheel opens on the claimed button-down.
   // Fullscreen apps (games) keep every click. Off here so a config without the field changes nothing;
   // the app's setting defaults it on.
   bool gameCheck = false;

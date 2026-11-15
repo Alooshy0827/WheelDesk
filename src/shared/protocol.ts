@@ -92,6 +92,8 @@ export type HelperCommand =
       trigger: HelperTrigger;
       triggerVk: number;
       clickPing: boolean;
+      /** Primary wheel opens immediately on the claimed button-down. */
+      openOnPress?: boolean;
       /** Fullscreen apps keep every click: no wheel gestures while one is in front. */
       gameCheck: boolean;
       /** 'off': no emote key, so no emote gestures. */
@@ -126,7 +128,7 @@ export function configCommand(
   s: Settings,
   enabled: boolean,
   live: { text: boolean; panel: boolean } = { text: false, panel: false },
-): HelperCommand {
+): Extract<HelperCommand, { type: 'config' }> {
   const t = s.trigger;
   // With the Emotes feature off the helper gets no emote key, so no emote wheel or emote click.
   const e = featureOn(s, 'emotes') ? s.emoteTrigger : 'off';
