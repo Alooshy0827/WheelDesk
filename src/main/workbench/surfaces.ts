@@ -100,7 +100,7 @@ export class DesktopSurfaces {
       const effects = wheel.effects.slice(0, wheel.slotCount);
       const items = slots.map(id => wb.actions.find(a => a.id === id));
       const effectNames = strings(lang, this.mac ? 'mac' : 'win').pingNames;
-      const labels = items.map((a, i) => a ? lang === 'en' ? a.nameEn || a.name : a.name : effectNames[effects[i]]);
+      const labels = items.map((a, i) => wheel.slotNames[i] || (a ? lang === 'en' ? a.nameEn || a.name : a.name : effectNames[effects[i]]));
       const visual = this.visual();
       this.gesture = { serial, displayId: p.display.id, origin: { x: p.x, y: p.y }, slots,
         labels, effects, visual };

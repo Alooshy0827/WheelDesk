@@ -90,11 +90,18 @@ app.whenReady().then(async () => {
     await until(() => win.webContents.executeJavaScript(`document.querySelectorAll('.weSlot').length === ${count} && document.querySelectorAll('.wdBinding').length === ${count}`), `render ${count} spokes`);
     countWheels.set(count, (await invoke({type:'state'})).state.settings.workbench.wheels[0]);
   }
+  async function setSlotName(index, value) {
+    const selector = `input[aria-label="位置 ${index + 1} · 自定义名称"]`;
+    await win.webContents.executeJavaScript(`(() => { const el = document.querySelector(${JSON.stringify(selector)}); el.focus(); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(el, ${JSON.stringify(value)}); el.dispatchEvent(new Event('input', {bubbles:true})); })()`);
+    await win.webContents.executeJavaScript(`document.querySelector(${JSON.stringify(selector)}).blur()`);
+    await until(async () => (await invoke({type:'state'})).state.settings.workbench.wheels[0].slotNames[index] === value, 'save custom slot name');
+  }
   await chooseCount(12);
   await win.webContents.executeJavaScript(`document.querySelectorAll('.wdBinding [role="combobox"]')[11].click()`);
   await until(() => win.webContents.executeJavaScript('Boolean(document.querySelector("[role=option]"))'), 'new spoke binding options');
   await win.webContents.executeJavaScript(`[...document.querySelectorAll('[role="option"]')].find(o => o.textContent === '复制').click()`);
   await until(async () => (await invoke({type:'state'})).state.settings.workbench.wheels[0].slots[11] === 'copy', 'save twelfth binding');
+  await setSlotName(11, '第十二个位置');
   await chooseCount(3);
   await new Promise(resolve => { win.webContents.once('did-finish-load', resolve); win.webContents.reload(); });
   await until(() => win.webContents.executeJavaScript('document.querySelectorAll(".weSlot").length === 3'), 'reload saved count');
@@ -106,10 +113,20 @@ app.whenReady().then(async () => {
   }
   const counted = (await invoke({type:'state'})).state.settings.workbench;
   assert.equal(counted.wheels[0].slots[11], 'copy');
+  assert.equal(counted.wheels[0].slotNames[11], '第十二个位置');
   assert.deepEqual(counted.wheels[0].slots.slice(0, 8), settings.workbench.wheels[0].slots);
   assert.equal(counted.wheels[1].slotCount, 8);
   assert.equal((await invoke({ type: 'save', settings })).ok, true);
   await until(() => win.webContents.executeJavaScript('document.querySelectorAll(".weSlot").length === 8'), 'restore eight-spoke fixture');
+  const customSlotName = '我的 <名字>';
+  await setSlotName(0, customSlotName);
+  await new Promise(resolve => { win.webContents.once('did-finish-load', resolve); win.webContents.reload(); });
+  await until(() => win.webContents.executeJavaScript(`document.querySelector('input[aria-label="位置 1 · 自定义名称"]')?.value === ${JSON.stringify(customSlotName)}`), 'reload custom slot name');
+  assert.equal((await invoke({type:'state'})).state.settings.workbench.wheels[1].slotNames[0], '');
+  settings.workbench.wheels[0].slotNames[0] = customSlotName;
+  await win.webContents.executeJavaScript('document.querySelector(".wdBindings").scrollIntoView({block:"start"})');
+  await pause(300);
+  writeFileSync(join(smokeDir, 'slot-names.png'), (await win.webContents.capturePage()).toPNG());
   nativeTheme.themeSource = 'dark'; await pause(500);
   writeFileSync(join(smokeDir, 'wheel-editor-dark.png'), (await win.webContents.capturePage()).toPNG());
   nativeTheme.themeSource = 'light';
@@ -195,16 +212,20 @@ app.whenReady().then(async () => {
     sim('kdown',360,330,{vk:164}); sim('mdown',360,330,{btn:'left'}); sim('move',360,190);
     await until(() => overlayJS('document.querySelector("#wheel").classList.contains("open")'), 'unbound wheel via production bridge');
     sim('move',360,180);
-    await until(() => overlayJS('document.querySelector("#wheel .centerTxt").textContent === "全力进攻"'), 'unbound slot uses effect name');
+    await until(() => overlayJS(`document.querySelector("#wheel .centerTxt").textContent === ${JSON.stringify(customSlotName)}`), 'custom name overrides unbound effect name');
     assert.equal(await overlayJS('document.querySelectorAll("#wheel .icon.dim").length'), 0);
     sim('mup',360,180,{btn:'left'}); sim('kup',360,180,{vk:164});
     await until(() => overlayJS('document.querySelectorAll(".clash img").length === 2'), 'unbound slot plays original All In effect');
     sim('mup',360,180,{btn:'left'});
     await pause(80);
     assert.equal(await overlayJS('document.querySelectorAll(".ping").length'), 1);
+    assert.equal(await overlayJS('document.querySelector(".ping .label").textContent'), customSlotName);
+    assert.equal(await overlayJS('document.querySelector(".ping .label").childElementCount'), 0);
     assert.deepEqual((await invoke({type:'state'})).state.run, beforeEmpty);
     assert(!BrowserWindow.getAllWindows().some(w => w.webContents.getURL().includes('#result')));
     sendOverlay({type:'close',clear:true});
+    await setSlotName(0, '');
+    assert.equal((await invoke({type:'state'})).state.settings.workbench.wheels[0].slotNames[0], '');
     assert.equal((await invoke({type:'save',settings})).ok,true);
   }
 
@@ -331,7 +352,7 @@ app.whenReady().then(async () => {
   await until(async () => (await invoke({type:'state'})).state.run.status === 'cancelled' && !resultWin.isVisible(), 'cancel without another popup');
   assert.deepEqual(errors, []);
   writeFileSync(join(smokeDir, 'report.json'), JSON.stringify({ passed: true, simulatedGestures: Boolean(simulatedHook), helper: finished.helper,
-    checks: ['eight provider presets and persistence', 'real model test and localized auth error', 'save-and-test persists successful keys with mock keychain', 'failed replacement preserves saved key', 'advanced settings collapsed by default', 'model-test sender validation', '2–12 spokes through real settings UI', 'per-wheel spoke count persistence after reload', 'hidden function restoration', 'dynamic overlay hit alignment', 'settings mounts', 'upstream six-section navigation', 'original effect/function pairs move and autosave', 'empty function slots', '12 original effects', 'original collision/ring/bobbing animations', '12 sounds fetched and decoded', 'preview does not execute actions', 'original wheel geometry/hover/transition', 'custom function labels', 'idle overlay cleanup', 'light and dark themes', 'Chinese language', 'independent branding', 'model listing', 'text-only AI request', 'no AI tools', 'streamed result', 'usage', 'renderer IPC permissions', 'real script action', 'ordinary actions never show result window', 'failure and manual input still show', 'cancellation stays hidden'], rendererErrors: errors }, null, 2));
+    checks: ['eight provider presets and persistence', 'real model test and localized auth error', 'save-and-test persists successful keys with mock keychain', 'failed replacement preserves saved key', 'advanced settings collapsed by default', 'model-test sender validation', '2–12 spokes through real settings UI', 'per-wheel spoke count persistence after reload', 'hidden function restoration', 'dynamic overlay hit alignment', 'settings mounts', 'upstream six-section navigation', 'original effect/function pairs move and autosave', 'empty function slots', '12 original effects', 'original collision/ring/bobbing animations', '12 sounds fetched and decoded', 'preview does not execute actions', 'original wheel geometry/hover/transition', 'custom function labels', 'idle overlay cleanup', 'light and dark themes', 'Chinese language', 'independent branding', 'model listing', 'text-only AI request', 'no AI tools', 'streamed result', 'usage', 'renderer IPC permissions', 'real script action', 'custom slot names persist across reload and resizing', 'custom names appear as text in wheel and effect', 'ordinary actions never show result window', 'failure and manual input still show', 'cancellation stays hidden'], rendererErrors: errors }, null, 2));
   console.log('WheelDesk smoke passed', JSON.stringify({ helper: finished.helper }));
   server.close(); app.quit();
 }).catch(error => { console.error(error, errors); if (server) server.close(); app.exit(1); });

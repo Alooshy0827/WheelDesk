@@ -23,3 +23,7 @@
 .wdModelPicker { display: flex; gap: 8px; flex-wrap: wrap; }
 .wdModelPicker > .fui-Combobox { flex: 1; min-width: 180px; }
 .wdModelEditor .expander { margin-top: 16px; border: 1px solid var(--stroke); border-radius: 8px; }
+
+.wdBinding>.wdBindingControls { flex: 0 1 260px; min-width: 0; display: grid; gap: 8px; }
+.wdBindingControls>label { display: grid; gap: 4px; }
+.wdBindingControls>.fui-Dropdown { width: 100%; min-width: 0; }

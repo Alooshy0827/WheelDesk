@@ -23,7 +23,7 @@ export interface ActionDefinition {
   output: 'card' | 'copy' | 'paste';
 }
 /** Entries beyond slotCount are retained so shrinking a wheel never discards bindings. */
-export interface WheelProfile { id: string; name: string; nameEn: string; slotCount: number; slots: (string | null)[]; effects: PingId[] }
+export interface WheelProfile { id: string; name: string; nameEn: string; slotCount: number; slots: (string | null)[]; effects: PingId[]; slotNames: string[] }
 export interface WorkflowStep { id: string; actionId: string; input: InputSource }
 export interface WorkflowDefinition { id: string; name: string; steps: WorkflowStep[] }
 export interface WorkbenchSettings {
@@ -76,8 +76,8 @@ export function defaultWorkbench(): WorkbenchSettings {
     action('toTools', '常用工具', 'Everyday tools', 'switchWheel', { value: 'tools' }),
   ];
   return { version: 1, activeWheelId: 'tools', actions, workflows: [], profiles: [], defaultProfileId: '', wheels: [
-    { id: 'tools', name: '常用工具', nameEn: 'Everyday tools', slotCount: 8, slots: actions.slice(0, 8).map(a => a.id), effects: [...DEFAULT_WHEEL] },
-    { id: 'ai', name: 'AI 助手', nameEn: 'AI assistant', slotCount: 8, slots: actions.slice(8).map(a => a.id), effects: [...DEFAULT_WHEEL] },
+    { id: 'tools', name: '常用工具', nameEn: 'Everyday tools', slotCount: 8, slots: actions.slice(0, 8).map(a => a.id), effects: [...DEFAULT_WHEEL], slotNames: Array(8).fill('') },
+    { id: 'ai', name: 'AI 助手', nameEn: 'AI assistant', slotCount: 8, slots: actions.slice(8).map(a => a.id), effects: [...DEFAULT_WHEEL], slotNames: Array(8).fill('') },
   ] };
 }
 const obj = (x: unknown): x is Record<string, unknown> => !!x && typeof x === 'object' && !Array.isArray(x);
@@ -106,14 +106,16 @@ export function resizeWheel(wheel: WheelProfile, count: number): WheelProfile {
   const slotCount = normalizeSlotCount(count);
   const capacity = Math.max(slotCount, wheel.slots.length);
   return { ...wheel, slotCount, effects: normalizeEffects(wheel.effects, capacity),
+    slotNames: Array.from({ length: capacity }, (_, i) => wheel.slotNames[i] ?? ''),
     slots: Array.from({ length: capacity }, (_, i) => wheel.slots[i] ?? null) };
 }
 
-/** Dragging a slot moves its effect and binding together; replacing artwork preserves that slot's action. */
+/** Dragging moves effect, binding and name together; replacing artwork preserves the action and name. */
 export function setWheelEffects(wheel: WheelProfile, effects: readonly string[]): WheelProfile {
   const next = normalizeEffects(effects, wheel.slotCount);
   const visibleEffects = wheel.effects.slice(0, wheel.slotCount);
   const visibleSlots = wheel.slots.slice(0, wheel.slotCount);
+  const names: string[] = [];
   const origins = next.map(id => visibleEffects.indexOf(id));
   const used = new Set(origins.filter(i => i >= 0));
   const slots = next.map((_, i) => {
@@ -123,11 +125,12 @@ export function setWheelEffects(wheel: WheelProfile, effects: readonly string[])
       from = !used.has(i) ? i : visibleSlots.findIndex((_, j) => !used.has(j));
       used.add(from);
     }
+    names.push(wheel.slotNames[from] ?? '');
     return visibleSlots[from] ?? null;
   });
   // A newly chosen effect may have belonged to a hidden slot. Keep its function and repair only its artwork.
   return { ...wheel, effects: normalizeEffects([...next, ...wheel.effects.slice(wheel.slotCount)], wheel.effects.length),
-    slots: [...slots, ...wheel.slots.slice(wheel.slotCount)] };
+    slots: [...slots, ...wheel.slots.slice(wheel.slotCount)], slotNames: [...names, ...wheel.slotNames.slice(wheel.slotCount)] };
 }
 
 /** Rebuilds persisted and IPC configuration without accepting arbitrary executable fields. */
@@ -147,12 +150,14 @@ export function normalizeWorkbench(raw: unknown): WorkbenchSettings {
     if (!obj(v) || !idOf(v.id)) return [];
     const slots = list(v.slots);
     const slotCount = normalizeSlotCount(v.slotCount);
-    const capacity = Math.max(slotCount, Math.min(WHEEL_SLOT_LIMITS.max, Math.max(8, slots.length, list(v.effects).length)));
+    const names = list(v.slotNames);
+    const capacity = Math.max(slotCount, Math.min(WHEEL_SLOT_LIMITS.max, Math.max(8, slots.length, list(v.effects).length, names.length)));
     return [{ id: idOf(v.id), name: str(v.name, 80), nameEn: str(v.nameEn, 80),
       slotCount, effects: normalizeEffects(v.effects, capacity),
+      slotNames: Array.from({ length: capacity }, (_, i) => str(names[i], 80).replace(/[\r\n\t]/g, ' ').trim()),
       slots: Array.from({ length: capacity }, (_, i) => actions.some(a => a.id === slots[i]) ? String(slots[i]) : null) }];
   }));
-  if (!wheels.length) wheels.push({ id: 'tools', name: '常用工具', nameEn: 'Everyday tools', slotCount: 8, slots: Array(8).fill(null), effects: [...DEFAULT_WHEEL] });
+  if (!wheels.length) wheels.push({ id: 'tools', name: '常用工具', nameEn: 'Everyday tools', slotCount: 8, slots: Array(8).fill(null), effects: [...DEFAULT_WHEEL], slotNames: Array(8).fill('') });
   const workflows = unique(list(raw.workflows).flatMap(v => {
     if (!obj(v) || !idOf(v.id)) return [];
     return [{ id: idOf(v.id), name: str(v.name, 80), steps: list(v.steps).slice(0, 50).flatMap(s =>

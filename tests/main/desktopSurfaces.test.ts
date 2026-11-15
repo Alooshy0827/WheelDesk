@@ -120,6 +120,17 @@ describe('original effects with custom functions', () => {
     expect(chosen).not.toHaveBeenCalled();
     expect(effects()).toEqual([expect.objectContaining({ effect: 'allin', name: '全力进攻' })]);
   });
+  it.each(['copy', null])('uses the custom name for binding %s and snapshots it for the effect', async binding => {
+    const wheel = state.settings.workbench.wheels[0];
+    wheel.slots[0] = binding;
+    wheel.slotNames[0] = 'My <custom> name';
+    await gesture();
+    expect(events().find(e => e.type === 'open')?.labels?.[0]).toBe('My <custom> name');
+    wheel.slotNames[0] = 'changed during gesture';
+    release();
+    expect(effects()[0]?.name).toBe('My <custom> name');
+    expect(chosen).toHaveBeenCalledTimes(binding ? 1 : 0);
+  });
   it('matches the original wheel dead zone at the configured scale', async () => {
     state.settings.wheelSizePx = 900;
     await gesture(); release(500, 380); // 120 < 86 * 900 / 600

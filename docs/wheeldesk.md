@@ -72,3 +72,10 @@ Old ad-hoc installations require one migration authorization because they did no
 Ordinary shortcuts, launching apps/paths/URLs, writing the clipboard, plain-text paste, wheel switching and waiting execute without opening a result window, including intermediate progress events and returned text. AI and scripts open a streaming/progress card only when their output mode is `card`; explicit copy/paste output stays silent on success. Clipboard reads and screenshots show a result only after completion when configured for a card. Screenshot region selection remains available without an extra execution dialog.
 
 Workflows retain progress/cancellation while running, then show a final result only if their last step requests a supported card output. Manual input and failures always retain their necessary UI; cancellation and empty completion do not open another card. The presentation is derived from the same immutable action snapshot as execution. A pending window load rechecks the current run before showing, preventing a stale dialog after cancellation or a new silent action. Repeated gestures during a silent run do not force the result window open.
+
+
+## Custom slot names
+
+Each wheel stores a `slotNames` array alongside effects and action bindings. Older settings gain empty names without changing their actions or artwork. Names are bounded to 80 UTF-16 units, trimmed and normalized to a single line. Every visible slot has a labeled draft input in the original settings card; Enter or blur saves it. Its placeholder shows the automatic fallback name.
+
+A nonempty custom name takes priority over the localized function/effect name in the wheel hover label and the selected effect label. The editor also displays the custom slot label. Names do not rename shared actions or effects and work for unbound slots. The main process snapshots the resolved name for each gesture; renderer text uses textContent, not HTML. Swaps move the name with the effect/action pair, artwork replacement retains it, reducing the count preserves hidden names, and duplicated wheels have independent copies.

@@ -56,6 +56,30 @@ describe('workbench configuration', () => {
     expect(replaced.slots).toEqual(wheel.slots);
     expect(replaced.effects[0]).toBe('bait');
   });
+  it('migrates and sanitizes per-slot names independently of action bindings', () => {
+    const wb = defaultWorkbench();
+    const old = wb.wheels.map(({ slotNames: _, ...w }) => w);
+    expect(normalizeWorkbench({ ...wb, wheels: old })).toEqual(wb);
+    const saved = normalizeWorkbench({ ...wb, wheels: [{ ...wb.wheels[0], slotNames: ['  我的名称  ', null, ' ', 'x'.repeat(100), 'a\nb'] }] });
+    expect(saved.wheels[0].slotNames.slice(0, 5)).toEqual(['我的名称', '', '', 'x'.repeat(80), 'a b']);
+    expect(saved.wheels[0].slots).toEqual(wb.wheels[0].slots);
+    expect(normalizeWorkbench(JSON.parse(JSON.stringify(saved)))).toEqual(saved);
+  });
+  it('moves names with slots and retains them on artwork replacement and count changes', () => {
+    const wb = defaultWorkbench();
+    const wheel = resizeWheel(wb.wheels[0], 12);
+    wheel.slotNames[0] = 'first'; wheel.slotNames[3] = 'fourth'; wheel.slotNames[11] = 'hidden';
+    const effects = [...wheel.effects]; [effects[0], effects[3]] = [effects[3], effects[0]];
+    const swapped = setWheelEffects(wheel, effects);
+    expect(swapped.slotNames[0]).toBe('fourth'); expect(swapped.slotNames[3]).toBe('first');
+    const smaller = resizeWheel(swapped, 4);
+    const replaced = setWheelEffects(smaller, ['assist', ...smaller.effects.slice(1, 4)]);
+    expect(replaced.slotNames).toEqual(smaller.slotNames);
+    const restored = resizeWheel(normalizeWorkbench({ ...wb, wheels: [replaced] }).wheels[0], 12);
+    expect(restored.slotNames).toEqual(swapped.slotNames);
+    const duplicate = structuredClone(restored); duplicate.slotNames[0] = 'another wheel';
+    expect(restored.slotNames[0]).toBe('fourth');
+  });
   it('repairs unknown and duplicate effects to eight unique built-in effects', () => {
     const s = defaultWorkbench();
     const normalized = normalizeWorkbench({ ...s, wheels: [{ ...s.wheels[0], effects: ['missing', 'missing', 'bad'] }] });
