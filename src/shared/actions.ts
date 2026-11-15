@@ -1,4 +1,5 @@
 import type { BuiltinProfile } from './teammate/settings';
+import { DESK_PROVIDERS } from './workbenchModels';
 import { ALL_PINGS, DEFAULT_WHEEL, isPingId, type PingId } from './pings';
 import { normalizeSlotCount, WHEEL_SLOT_LIMITS } from './geometry';
 
@@ -159,7 +160,7 @@ export function normalizeWorkbench(raw: unknown): WorkbenchSettings {
   }));
   const profiles = unique(list(raw.profiles).slice(0, 20).flatMap(v => {
     if (!obj(v) || !idOf(v.id)) return [];
-    return [{ id: idOf(v.id), name: str(v.name, 80), kind: 'builtin', provider: 'custom',
+    return [{ id: idOf(v.id), name: str(v.name, 80), kind: 'builtin', provider: DESK_PROVIDERS.find(p => p.id === v.provider)?.id ?? 'custom',
       protocol: v.protocol === 'anthropic' ? 'anthropic' : 'openai', baseUrl: str(v.baseUrl, 2048),
       model: str(v.model, 200), tagColor: 3, tagColorCustom: null } satisfies BuiltinProfile];
   }));

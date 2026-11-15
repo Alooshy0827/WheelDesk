@@ -160,8 +160,12 @@ app.whenReady().then(async () => {
   await until(() => !overlay.isVisible(), 'empty overlay hides after animation');
 
   const requests = [];
+  let probeStatus = 200;
+  const authHeaders = [];
   server = createServer(async (req, res) => {
     if (req.url === '/v1/models') { res.setHeader('Content-Type', 'application/json'); res.end(JSON.stringify({ data: [{ id: 'fixture-model' }] })); return; }
+    authHeaders.push(req.headers.authorization);
+    if (probeStatus !== 200) { res.writeHead(probeStatus, {'Content-Type':'application/json'}); res.end(JSON.stringify({error:{message:'do-not-leak-draft-key'}})); return; }
     let text = ''; for await (const chunk of req) text += chunk;
     const body = JSON.parse(text); requests.push(body);
     res.setHeader('Content-Type', 'text/event-stream');
@@ -174,6 +178,55 @@ app.whenReady().then(async () => {
   settings.workbench.defaultProfileId = 'fixture';
   settings.workbench.actions.push({ id: 'smokeAI', name: '测试 AI', nameEn: 'Test AI', kind: 'ai', input: 'none', value: 'Translate hello', windows: '', mac: '', profileId: '', timeoutS: 10, output: 'card' });
   assert.equal((await invoke({ type: 'save', settings })).ok, true);
+  await win.webContents.executeJavaScript(`document.querySelector('[data-section="models"]').click()`);
+  await pause(600);
+  const expectedPresets = [
+    ['OpenAI', 'openai', 'https://api.openai.com/v1', 'openai'],
+    ['Anthropic / Claude', 'anthropic', 'https://api.anthropic.com', 'anthropic'],
+    ['DeepSeek', 'deepseek', 'https://api.deepseek.com', 'openai'],
+    ['阿里云百炼 / 通义千问（中国内地）', 'qwen', 'https://dashscope.aliyuncs.com/compatible-mode/v1', 'openai'],
+    ['Kimi / Moonshot（国内）', 'kimi', 'https://api.moonshot.cn/v1', 'openai'],
+    ['Google Gemini', 'gemini', 'https://generativelanguage.googleapis.com/v1beta/openai', 'openai'],
+    ['Ollama（本地）', 'ollama', 'http://localhost:11434/v1', 'openai'],
+    ['LM Studio（本地）', 'lmstudio', 'http://localhost:1234/v1', 'openai'],
+  ];
+  for (const [label, provider, baseUrl, protocol] of expectedPresets) {
+    await win.webContents.executeJavaScript(`document.querySelector('[role="combobox"][aria-label="厂商预设"]').click()`);
+    await until(() => win.webContents.executeJavaScript(`document.getElementById(document.querySelector('[role="combobox"][aria-label="厂商预设"]').getAttribute('aria-controls'))?.querySelectorAll('[role="option"]').length === 9`), 'provider menu ' + label);
+    await win.webContents.executeJavaScript(`[...document.querySelectorAll('[role=option]')].find(o => o.textContent === ${JSON.stringify(label)}).click()`);
+    await until(async () => (await invoke({type:'state'})).state.settings.workbench.profiles[0].provider === provider, `saved ${provider}`);
+    const p = (await invoke({type:'state'})).state.settings.workbench.profiles[0];
+    assert.equal(p.baseUrl, baseUrl); assert.equal(p.protocol, protocol); assert.equal(p.model, '');
+  }
+  await new Promise(resolve => { win.webContents.once('did-finish-load', resolve); win.webContents.reload(); });
+  await until(() => win.webContents.executeJavaScript('document.querySelector("[aria-label=厂商预设]")?.textContent.includes("LM Studio")'), 'provider persists after reload');
+  assert.equal((await invoke({ type: 'save', settings })).ok, true);
+  await until(() => win.webContents.executeJavaScript('document.querySelector("[aria-label=厂商预设]")?.textContent.includes("自定义")'), 'fixture configuration');
+  await win.webContents.executeJavaScript(`document.querySelector('[data-section="models"]').click()`);
+  await pause(600);
+  const clickModelButton = label => win.webContents.executeJavaScript(`[...document.querySelectorAll('.wdModelEditor button')].find(b => b.textContent === ${JSON.stringify(label)}).click()`);
+  const modelStatus = () => win.webContents.executeJavaScript('document.querySelector(".wdModelEditor [role=status]")?.textContent || ""');
+  await win.webContents.executeJavaScript(`(() => { const el = document.querySelector('input[aria-label="API 密钥"]'); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(el, 'draft-probe-key'); el.dispatchEvent(new Event('input', {bubbles:true})); })()`);
+  await clickModelButton('测试连接');
+  await until(async () => (await modelStatus()).includes('连接成功'), 'real connection-test button');
+  assert.equal(authHeaders.at(-1), 'Bearer draft-probe-key');
+  assert.equal((await invoke({type:'state'})).state.keyIds.includes('fixture'), false);
+  assert.equal(requests.at(-1).messages[1].content, 'Reply with OK.');
+  assert(!requests.at(-1).tools);
+  await win.webContents.executeJavaScript(`document.querySelector('.wdModelEditor [role="status"]').scrollIntoView({block:'center',behavior:'instant'})`);
+  writeFileSync(join(smokeDir, 'model-presets.png'), (await win.webContents.capturePage()).toPNG());
+  probeStatus = 401;
+  await clickModelButton('测试连接');
+  await until(async () => (await modelStatus()).includes('API 密钥验证失败'), 'localized connection failure');
+  assert(!(await modelStatus()).includes('do-not-leak'));
+  await win.webContents.executeJavaScript(`document.querySelector('.wdModelEditor [role="status"]').scrollIntoView({block:'center',behavior:'instant'})`);
+  writeFileSync(join(smokeDir, 'model-test-error.png'), (await win.webContents.capturePage()).toPNG());
+  probeStatus = 200;
+  requests.length = 0;
+  assert.equal((await invoke({type:'testModel',id:'fixture',key:123})).ok, false);
+  assert.equal((await overlayJS('window.desk.invoke({type:"testModel",id:"fixture"})')).ok, false);
+  await clickModelButton('获取模型列表');
+  await until(async () => (await modelStatus()).includes('已获取 1 个模型'), 'model-list button');
   const checked = await invoke({ type: 'check', id: 'fixture' }); assert.deepEqual(checked.models, ['fixture-model']);
   assert.equal((await invoke({ type: 'run', id: 'smokeAI' })).ok, true);
   const finished = await until(async () => { const s = (await invoke({ type: 'state' })).state; return s.run.status === 'completed' && s.run.name === '测试 AI' ? s : null; }, 'AI result', 20000);
@@ -185,13 +238,14 @@ app.whenReady().then(async () => {
   assert.equal((await resultWin.webContents.executeJavaScript('window.desk.invoke({type:"save",settings:{}})')).ok, false);
   assert.equal((await resultWin.webContents.executeJavaScript('window.desk.invoke({type:"key",id:"fixture",key:"not-stored"})')).ok, false);
   assert.equal((await resultWin.webContents.executeJavaScript('window.desk.invoke({type:"previewEffect",effect:"danger"})')).ok, false);
+  assert.equal((await resultWin.webContents.executeJavaScript('window.desk.invoke({type:"testModel",id:"fixture"})')).ok, false);
   settings.workbench.actions.push({ id: 'smokeScript', name: '脚本测试', nameEn: 'Script test', kind: 'script', input: 'none', value: '', windows: '[Console]::Write("script-ok")', mac: 'printf script-ok', profileId: '', timeoutS: 5, output: 'card' });
   assert.equal((await invoke({ type: 'save', settings })).ok, true);
   assert.equal((await invoke({ type: 'run', id: 'smokeScript' })).ok, true);
   await until(async () => { const s = (await invoke({ type: 'state' })).state; return s.run.status === 'completed' && s.run.text === 'script-ok'; }, 'real script action');
   assert.deepEqual(errors, []);
   writeFileSync(join(smokeDir, 'report.json'), JSON.stringify({ passed: true, helper: finished.helper,
-    checks: ['2–12 spokes through real settings UI', 'per-wheel spoke count persistence after reload', 'hidden function restoration', 'dynamic overlay hit alignment', 'settings mounts', 'upstream six-section navigation', 'original effect/function pairs move and autosave', 'empty function slots', '12 original effects', 'original collision/ring/bobbing animations', '12 sounds fetched and decoded', 'preview does not execute actions', 'original wheel geometry/hover/transition', 'custom function labels', 'idle overlay cleanup', 'light and dark themes', 'Chinese language', 'independent branding', 'model listing', 'text-only AI request', 'no AI tools', 'streamed result', 'usage', 'renderer IPC permissions', 'real script action'], rendererErrors: errors }, null, 2));
+    checks: ['eight provider presets and persistence', 'real model test and localized auth error', 'draft key used without persisting', 'model-test sender validation', '2–12 spokes through real settings UI', 'per-wheel spoke count persistence after reload', 'hidden function restoration', 'dynamic overlay hit alignment', 'settings mounts', 'upstream six-section navigation', 'original effect/function pairs move and autosave', 'empty function slots', '12 original effects', 'original collision/ring/bobbing animations', '12 sounds fetched and decoded', 'preview does not execute actions', 'original wheel geometry/hover/transition', 'custom function labels', 'idle overlay cleanup', 'light and dark themes', 'Chinese language', 'independent branding', 'model listing', 'text-only AI request', 'no AI tools', 'streamed result', 'usage', 'renderer IPC permissions', 'real script action'], rendererErrors: errors }, null, 2));
   console.log('WheelDesk smoke passed', JSON.stringify({ helper: finished.helper }));
   server.close(); app.quit();
 }).catch(error => { console.error(error); if (server) server.close(); app.exit(1); });

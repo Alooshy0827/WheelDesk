@@ -4,6 +4,7 @@ import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { setTimeout as wait } from 'node:timers/promises';
 import { SettingsStore } from './settingsStore';
+import { clearChangedModelKeys, modelError, testModelConnection } from './workbench/models';
 import { InputBridge } from './inputBridge';
 import { configCommand, type HelperEvent } from '../shared/protocol';
 import { deskError, deskText, resolveLang } from '../shared/i18n';
@@ -301,6 +302,7 @@ async function handle(sender: Electron.WebContents, raw: unknown): Promise<DeskR
         wheelSizePx: s.wheelSizePx, pingSizePx: s.pingSizePx, pingDurationS: s.pingDurationS,
         volume: s.volume, muted: s.muted, tickSound: s.tickSound }, platform);
       const problems = store.problems.length;
+      await clearChangedModelKeys(store.get().workbench.profiles, normalized.workbench.profiles, secrets);
       store.update(normalized); await store.flush();
       if (store.problems.length > problems) throw new Error('saveFailed');
       return { ok: true, state: state() };
@@ -319,12 +321,17 @@ async function handle(sender: Electron.WebContents, raw: unknown): Promise<DeskR
         || !store.get().workbench.profiles.some(p => p.id === raw.id)) return { ok: false };
       await secrets.setKey(raw.id, raw.key); broadcast(); return { ok: true };
     }
-    case 'check': {
-      if (!isSettings) return { ok: false };
+    case 'check':
+    case 'testModel': {
+      if (!isSettings || typeof raw.id !== 'string' || (raw.key !== undefined &&
+        (typeof raw.key !== 'string' || raw.key.length > 8192))) return { ok: false };
       const p = store.get().workbench.profiles.find(p => p.id === raw.id);
       if (!p) throw new Error('modelMissing');
-      try { return { ok: true, models: await createAdapter(p, secrets.key(p.id) ?? '').listModels(AbortSignal.timeout(15000)) }; }
-      catch (e) { throw new Error(e instanceof ProviderError ? ['auth', 'rate', 'network'].includes(e.kind) ? e.kind : 'provider' : 'timeout'); }
+      const key = typeof raw.key === 'string' && raw.key.trim() ? raw.key.trim() : secrets.key(p.id) ?? '';
+      if (raw.type === 'testModel') return { ok: true, latencyMs: await testModelConnection(p, key) };
+      const signal = AbortSignal.timeout(15000);
+      try { return { ok: true, models: await createAdapter(p, key).listModels(signal) }; }
+      catch (e) { throw new Error(modelError(e, signal)); }
     }
     case 'input': {
       if (!isResult || !requestedInput) return { ok: false };

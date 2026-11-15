@@ -4,6 +4,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 're
 import type { DeskCommand, DeskReply, DeskState } from '../../shared/ipc';
 import { ACTION_KINDS, INPUT_SOURCES, defaultWorkbench, newAction, resizeWheel, setWheelEffects, validateWorkflow, type ActionDefinition, type ActionKind, type InputSource, type WorkbenchSettings } from '../../shared/actions';
 import { WHEEL_SLOT_LIMITS } from '../../shared/geometry';
+import { applyModelPreset, DESK_PROVIDERS } from '../../shared/workbenchModels';
 import { keyboardTriggers, triggerLabel, type Settings, type TriggerKey } from '../../shared/settings';
 import { deskError, deskText, strings } from '../../shared/i18n';
 import { ExpanderRow, OnOffSwitch, SettingRow, SliderRow, SwitchRow } from '../settings/components/rows';
@@ -48,6 +49,8 @@ export function SettingsApp() {
   const [wheelId, setWheelId] = useState(''), [actionId, setActionId] = useState(''), [flowId, setFlowId] = useState(''), [profileId, setProfileId] = useState('');
   const [key, setKey] = useState(''), [modelIds, setModelIds] = useState<string[]>([]);
   const [pending, setPending] = useState(false);
+  const modelBusy = useRef(false), modelRevision = useRef(0);
+  const [modelStatus, setModelStatus] = useState<{ text: string; error: boolean } | null>(null);
   useEffect(() => {
     const receive = (s: DeskState) => {
       setState(s); document.documentElement.dataset.platform = s.platform; document.documentElement.lang = s.lang;
@@ -122,7 +125,27 @@ export function SettingsApp() {
   const patchAction = (patch: Partial<ActionDefinition>) => edit({ actions: wb.actions.map(a => a.id === action.id ? { ...a, ...patch } : a) });
   const patchFlow = (patch: Partial<typeof flow>) => edit({ workflows: wb.workflows.map(f => f.id === flow.id ? { ...f, ...patch } : f),
     ...(patch.name !== undefined ? { actions: wb.actions.map(a => a.kind === 'workflow' && a.value === flow.id ? { ...a, name: patch.name ?? '', nameEn: patch.name ?? '' } : a) } : {}) });
-  const patchProfile = (patch: Partial<typeof profile>) => edit({ profiles: wb.profiles.map(p => p.id === profile.id ? { ...p, ...patch } : p) });
+  const resetModelStatus = () => { modelRevision.current++; setModelStatus(null); setModelIds([]); };
+  const patchProfile = (patch: Partial<typeof profile>) => {
+    resetModelStatus();
+    if (patch.baseUrl !== undefined || patch.protocol !== undefined || patch.provider !== undefined) setKey('');
+    edit({ profiles: wb.profiles.map(p => p.id === profile.id ? { ...p, ...patch } : p) });
+  };
+  const modelRequest = async (type: 'check' | 'testModel' | 'key') => {
+    if (modelBusy.current || !profile) return;
+    modelBusy.current = true; setPending(true); setModelStatus(null);
+    const at = modelRevision.current, id = profile.id, draftKey = key;
+    try {
+      if (!await flush()) return;
+      const reply = await window.desk.invoke({ type, id, key: draftKey });
+      if (at !== modelRevision.current) return;
+      if (!reply.ok) { setModelStatus({ text: reply.error ?? t.failed, error: true }); return; }
+      if (type === 'key') { setKey(''); setModelStatus({ text: t.saved, error: false }); }
+      else if (type === 'check') { setModelIds(reply.models ?? []); setModelStatus({ text: t.modelsLoaded.replace('{{count}}', String(reply.models?.length ?? 0)), error: false }); }
+      else setModelStatus({ text: t.connectionOK.replace('{{ms}}', String(reply.latencyMs ?? 0)), error: false });
+    } catch { if (at === modelRevision.current) setModelStatus({ text: t.failed, error: true }); }
+    finally { modelBusy.current = false; setPending(false); }
+  };
   const sectionNames: Record<Section, string> = { trigger: upstream.navTrigger, wheels: t.wheels, actions: t.actions, workflows: t.workflows, models: t.models, general: t.general };
   const navIcons = [<Cursor24Regular/>, <DataPie24Regular/>, <Apps24Regular/>, <ArrowSync24Regular/>, <Sparkle24Regular/>, <Settings24Regular/>];
   const off = !draft.enabledOnStart;
@@ -197,14 +220,17 @@ export function SettingsApp() {
           {validateWorkflow(flow, wb).map((issue, i) => <p className="wdError" key={i}>{t.step} {issue.step + 1}: {deskError(issue.code, state.lang)}</p>)}
         </div> : <div className="card notes"><div className="lbl">{t.noSteps}</div></div>}
         <div className="section" id="models">{t.models}</div>
-        <SettingRow icon={<Sparkle24Regular/>} title={t.models} description={t.modelHint}><Choice label={t.models} value={profile?.id ?? ''} options={wb.profiles} onChange={id => { setProfileId(id); setKey(''); setModelIds([]); }}/><Button icon={<Add24Regular/>} aria-label={t.newModel} onClick={() => { const id = uid(); edit({ profiles: [...wb.profiles, { id, name: t.newModel, kind: 'builtin', provider: 'custom', protocol: 'openai', baseUrl: 'https://api.openai.com/v1', model: '', tagColor: 3, tagColorCustom: null }], defaultProfileId: wb.defaultProfileId || id }); setProfileId(id); setKey(''); }}/></SettingRow>
-        {profile ? <div className="card mate wdEditor"><div className="mateHead"><b>{profile.name}</b><Button icon={<Delete24Regular/>} onClick={() => remove(() => edit({ profiles: wb.profiles.filter(p => p.id !== profile.id) }))}>{t.remove}</Button></div>
+        <SettingRow icon={<Sparkle24Regular/>} title={t.models} description={t.modelHint}><Choice label={t.models} value={profile?.id ?? ''} options={wb.profiles} onChange={id => { setProfileId(id); setKey(''); resetModelStatus(); }}/><Button icon={<Add24Regular/>} aria-label={t.newModel} onClick={() => { const id = uid(); edit({ profiles: [...wb.profiles, { id, name: t.newModel, kind: 'builtin', provider: 'openai', protocol: 'openai', baseUrl: 'https://api.openai.com/v1', model: '', tagColor: 3, tagColorCustom: null }], defaultProfileId: wb.defaultProfileId || id }); setProfileId(id); setKey(''); resetModelStatus(); }}/></SettingRow>
+        {profile ? <div className="card mate wdEditor wdModelEditor"><fieldset className="wdModelFields" disabled={pending}><div className="mateHead"><b>{profile.name}</b><Button icon={<Delete24Regular/>} disabled={pending} onClick={() => remove(() => { resetModelStatus(); setKey(''); edit({ profiles: wb.profiles.filter(p => p.id !== profile.id) }); })}>{t.remove}</Button></div>
+          <EditField label={t.providerPreset} hint={t.presetHint}><Choice label={t.providerPreset} value={profile.provider} options={DESK_PROVIDERS.map(p => ({ id: p.id, name: t.providerNames[p.id as keyof typeof t.providerNames] ?? p.name }))} onChange={id => patchProfile(applyModelPreset(profile, id))}/></EditField>
           <EditField label={t.name}><Input value={profile.name} maxLength={80} onChange={(_, d) => patchProfile({ name: d.value })}/></EditField><EditField label={t.protocol}><Choice label={t.protocol} value={profile.protocol} options={[{ id: 'openai', name: 'OpenAI' }, { id: 'anthropic', name: 'Anthropic' }]} onChange={protocol => patchProfile({ protocol: protocol as 'openai' | 'anthropic' })}/></EditField>
-          <EditField label={t.baseUrl}><Input value={profile.baseUrl} onChange={(_, d) => patchProfile({ baseUrl: d.value })}/></EditField><EditField label={t.model}><Input value={profile.model} onChange={(_, d) => patchProfile({ model: d.value })}/>{modelIds.length > 0 && <Choice label={t.model} value={profile.model} options={modelIds.map(id => ({ id, name: id }))} onChange={model => patchProfile({ model })}/>}</EditField>
-          <EditField label={t.key} hint={state.keyIds.includes(profile.id) ? t.keyStored : t.modelHint}><Input type="password" autoComplete="new-password" value={key} onChange={(_, d) => setKey(d.value)}/></EditField>
-          <div className="wdButtons"><Button disabled={pending} onClick={async () => { if (!await flush()) return; setPending(true); const reply = await invoke({ type: 'key', id: profile.id, key }); setPending(false); if (reply.ok) { setKey(''); notice(t.saved); } }}>{t.saveKey}</Button><Button disabled={pending} onClick={async () => { if (!await flush()) return; setPending(true); const reply = await invoke({ type: 'check', id: profile.id }); setPending(false); if (reply.ok) { setModelIds(reply.models ?? []); notice(t.completed); } }}>{pending ? t.running : t.check}</Button></div>
+          <EditField label={t.baseUrl}><Input aria-label={t.baseUrl} value={profile.baseUrl} onChange={(_, d) => patchProfile({ baseUrl: d.value })}/></EditField><EditField label={t.model}><Input aria-label={t.model} value={profile.model} onChange={(_, d) => patchProfile({ model: d.value })}/>{modelIds.length > 0 && <Choice label={t.model} value={profile.model} options={modelIds.map(id => ({ id, name: id }))} onChange={model => patchProfile({ model })}/>}</EditField>
+          <EditField label={t.key} hint={state.keyIds.includes(profile.id) ? t.keyStored : t.modelHint}><Input aria-label={t.key} type="password" autoComplete="new-password" value={key} onChange={(_, d) => { setKey(d.value); modelRevision.current++; setModelStatus(null); }}/></EditField>
+          <div className="wdButtons"><Button disabled={pending} onClick={() => void modelRequest('key')}>{t.saveKey}</Button><Button disabled={pending} onClick={() => void modelRequest('check')}>{t.check}</Button><Button appearance="primary" disabled={pending} onClick={() => void modelRequest('testModel')}>{pending ? t.connecting : t.testConnection}</Button></div>
+          <p className="desc">{t.connectionHint}</p>
+          {modelStatus && <p role="status" className={modelStatus.error ? 'wdError' : 'wdModelSuccess'}>{modelStatus.text}</p>}
           <EditField label={t.defaultModel}><Choice label={t.defaultModel} value={wb.defaultProfileId} options={wb.profiles} onChange={defaultProfileId => edit({ defaultProfileId })}/></EditField>
-        </div> : <div className="card notes"><div className="lbl">{t.noModels}</div></div>}
+        </fieldset></div> : <div className="card notes"><div className="lbl">{t.noModels}</div></div>}
         <div className="section" id="general">{t.general}</div>
         <SwitchRow icon={<Rocket24Regular/>} title={t.launch} description={upstream.launchAtStartupDesc} checked={draft.launchAtStartup} onChange={launchAtStartup => changeSettings({ launchAtStartup })}/>
         <SettingRow icon={<LocalLanguage24Regular/>} title={t.language}><Choice label={t.language} value={draft.language} options={[{ id: 'auto', name: t.auto }, { id: 'zh-CN', name: '简体中文' }, { id: 'en', name: 'English' }]} onChange={language => changeSettings({ language: language as Settings['language'] })}/></SettingRow>

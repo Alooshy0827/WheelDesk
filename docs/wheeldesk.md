@@ -40,6 +40,16 @@ Model requests use the existing OpenAI-compatible/Anthropic streaming adapters w
 
 Scripts are explicit local configuration. Their input is stdin, not code substitution. Each run writes a private temporary script, spawns the platform interpreter without a shell wrapper, bounds stdout/stderr, and kills its process group/tree on cancellation. Windows script files use UTF-8 BOM and console input/output encoding for Unicode text.
 
+## Model presets and connection test
+
+The model editor offers OpenAI, Anthropic/Claude, DeepSeek, Qwen (China), Kimi (China), Gemini, Ollama, LM Studio and Custom. Selecting a vendor fills its protocol and base URL and clears the model ID; Custom preserves the endpoint. IDs and edited URLs persist. Defaults reuse the upstream provider catalog; regional URLs can be entered manually.
+
+Fetch models remains a separate list request. Test connection sends only a fixed short text prompt through the configured model adapter, with no screenshots, selection, clipboard or tools. It uses a typed key for that request only, falling back to the encrypted key when blank. A successful response must contain text, with elapsed milliseconds shown; authentication, rate limits, missing endpoints/models, empty responses and 30-second timeout failures are localized. Server error bodies and credentials are not shown. The editor disables fields during the request and ignores results belonging to a previously selected configuration.
+
+Main restricts these commands to the settings renderer and validates input. Changing an endpoint/protocol or deleting a profile clears its encrypted credential before saving; model/name-only edits preserve it. No user data is sent by the connection test. Live vendor/model compatibility still requires a real key.
+
+Preset references: [Qwen regional URLs](https://help.aliyun.com/zh/model-studio/base-url), [Gemini compatibility](https://ai.google.dev/gemini-api/docs/openai), [DeepSeek API](https://api-docs.deepseek.com/), [Ollama](https://docs.ollama.com/api/openai-compatibility), [LM Studio](https://lmstudio.ai/docs/developer/openai-compat).
+
 ## Distribution
 
 New application ID: `app.wheeldesk.desktop`. Only the workbench renderer is built. The assets publicDir contains the original ping textures and sounds with their media attribution. A secure local wheeldesk://app origin serves only files inside the renderer directory, enabling the original fetch-based Web Audio loader in packaged apps. No updater or relay is initialized. Installers are internal artifacts and not automatically published. See validation.md for actual verification, including OS permission limits.

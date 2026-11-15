@@ -347,13 +347,13 @@ export type DeskCommand =
   | { type: 'run'; id: string }
   | { type: 'cancel' }
   | { type: 'key'; id: string; key: string }
-  | { type: 'check'; id: string }
+  | { type: 'check' | 'testModel'; id: string; key?: string }
   | { type: 'input'; text?: string; clipboard?: boolean }
   | { type: 'capture'; rect: { x: number; y: number; w: number; h: number } | null }
   | { type: 'overlayIdle'; idle: boolean }
   | { type: 'previewEffect'; effect: string }
   | { type: 'copy' | 'paste' | 'close' | 'retry' | 'accessibility' | 'screenPermission' | 'data' };
-export interface DeskReply { ok: boolean; error?: string; models?: string[]; state?: DeskState }
+export interface DeskReply { ok: boolean; error?: string; models?: string[]; latencyMs?: number; state?: DeskState }
 export interface DeskOverlay {
   type: 'open' | 'move' | 'close' | 'capture' | 'effect';
   x?: number; y?: number;
