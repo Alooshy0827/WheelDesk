@@ -23,3 +23,5 @@ Use strict TypeScript, two spaces, single quotes and semicolons. Avoid any, non-
 Run npm run typecheck, npm run test:helper, npm test and npm run build. Test new execution logic by its observable behavior. Test input/overlay changes in a real app on the affected platform; never claim permission-dependent tests passed when the OS blocked them. tools/smoke.cjs runs the real app with an isolated WHEELDESK_DATA_DIR and a local model fixture.
 
 Do not commit node_modules, generated bundles, installers, test data, keys or screenshots of private content. Installer workflow is manual and must not publish releases automatically. Describe actual validation and remaining limitations in docs/validation.md.
+
+On macOS, package temporary .app bundles under an ignored hidden staging directory. After verification, unregister and remove those generated bundles, keeping the DMG and a single canonical /Applications/WheelDesk.app. Do not leave installation-test copies that become duplicate application-list entries. Preserve user data and never reset the global Launch Services database.

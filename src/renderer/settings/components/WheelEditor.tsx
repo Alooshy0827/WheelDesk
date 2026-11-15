@@ -14,9 +14,9 @@ const R_OUT = 146;
 const R_ICON = 100;
 const GAP = 0.035;
 const pt = (r: number, a: number): string => `${C + r * Math.sin(a)},${C - r * Math.cos(a)}`;
-const wedgePath = (i: number): string => {
-  const a0 = ((i - 0.5) * Math.PI) / 4 + GAP;
-  const a1 = ((i + 0.5) * Math.PI) / 4 - GAP;
+const wedgePath = (i: number, count: number): string => {
+  const a0 = ((i - 0.5) * Math.PI * 2) / count + GAP;
+  const a1 = ((i + 0.5) * Math.PI * 2) / count - GAP;
   return `M${pt(R_IN, a0)} A${R_IN},${R_IN} 0 0 1 ${pt(R_IN, a1)} L${pt(R_OUT, a1)} A${R_OUT},${R_OUT} 0 0 0 ${pt(R_OUT, a0)}Z`;
 };
 
@@ -40,6 +40,7 @@ interface Props<T extends string> {
   /** WheelDesk keeps the center reserved for cancellation. Existing editors remain editable. */
   centerEditable?: boolean;
   centerLabel?: string;
+  slotLabels?: readonly string[];
   /** WheelDesk's empty item clears a slot instead of swapping with another empty slot. */
   emptyId?: T;
   trigger: string;
@@ -68,7 +69,7 @@ const activate = (fn: () => void) => (e: KeyboardEvent) => {
 };
 
 export function WheelEditor<T extends string>({
-  wheel, center, centerOn, centerEditable = true, centerLabel, emptyId, trigger, pool, defaults, labels, poolExtra, onDropFiles, onFxPick, fxIds, fxFor, onChange, onPreview,
+  wheel, center, centerOn, centerEditable = true, centerLabel, slotLabels, emptyId, trigger, pool, defaults, labels, poolExtra, onDropFiles, onFxPick, fxIds, fxFor, onChange, onPreview,
 }: Props<T>) {
   const t = useText();
   const [picked, setPicked] = useState<WheelSource<T> | null>(null);
@@ -157,6 +158,8 @@ export function WheelEditor<T extends string>({
   const byId = new Map(pool.map((p) => [p.id, p]));
   const name = (id: T) => byId.get(id)?.name ?? '?';
   const icon = (id: T) => byId.get(id)?.icon;
+  const slotName = (i: number) => slotLabels?.[i] ?? t.slotNames[i] ?? String(i + 1);
+  const slotSize = Math.min(56, Math.floor(2 * R_ICON * Math.sin(Math.PI / wheel.length) - 6));
   const isPicked = (match: (p: WheelSource<T>) => boolean) => (picked !== null && match(picked) ? ' picked' : '');
 
   return (
@@ -179,23 +182,24 @@ export function WheelEditor<T extends string>({
         <div className="weWheel" style={{ width: SIZE, height: SIZE }}>
           <svg viewBox={`0 0 ${SIZE} ${SIZE}`} width={SIZE} height={SIZE}>
             {wheel.map((id, i) => (
-              <path key={i} d={wedgePath(i)} className={`weWedge${hot === i ? ' hot' : ''}`} {...dropProps(i)}
+              <path key={i} d={wedgePath(i, wheel.length)} className={`weWedge${hot === i ? ' hot' : ''}`} {...dropProps(i)}
                 onClick={() => clickTarget(i, { from: 'slot', id, slot: i })} />
             ))}
           </svg>
           {wheel.map((id, i) => {
-            const a = (i * Math.PI) / 4;
-            const label = t.wheelSlotLabel(t.slotNames[i], name(id));
+            const a = (i * Math.PI * 2) / wheel.length;
+            const label = t.wheelSlotLabel(slotName(i), name(id));
             return (
               <div key={i} role="button" tabIndex={0} aria-label={label} title={label}
                 className={`weSlot${hot === i ? ' hot' : ''}${isPicked((p) => p.from === 'slot' && p.slot === i)}`}
-                style={{ left: C + R_ICON * Math.sin(a), top: C - R_ICON * Math.cos(a) }}
+                style={{ left: C + R_ICON * Math.sin(a), top: C - R_ICON * Math.cos(a),
+                  width: slotSize, height: slotSize, marginLeft: -slotSize / 2, marginTop: -slotSize / 2 }}
                 {...dragProps({ from: 'slot', id, slot: i })} {...dropProps(i)}
                 onClick={() => clickTarget(i, { from: 'slot', id, slot: i })}
                 onKeyDown={activate(() => clickTarget(i, { from: 'slot', id, slot: i }))}
                 onContextMenu={(e) => openFx(id, e)}>
                 {/* Keyed by ping, so a ping dropped here pops in. */}
-                <img key={id} src={icon(id)} alt="" />
+                <img key={id} src={icon(id)} alt="" style={{ width: Math.min(46, slotSize - 8), height: Math.min(46, slotSize - 8) }} />
               </div>
             );
           })}
@@ -226,7 +230,7 @@ export function WheelEditor<T extends string>({
                     {...dragProps({ from: 'pool', id: p.id })} onClick={pick} onKeyDown={activate(pick)}
                     onContextMenu={(e) => openFx(p.id, e)}>
                     {p.badge ? <span className="weNew">{p.badge}</span> : null}
-                    {slot >= 0 ? <span className="weWhere">{t.slotNames[slot]}</span> : null}
+                    {slot >= 0 ? <span className="weWhere">{slotName(slot)}</span> : null}
                     <img src={p.icon} alt="" />
                     {p.name}
                   </div>

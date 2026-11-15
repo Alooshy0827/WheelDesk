@@ -8,6 +8,17 @@ const at = (deg: number, r = 150) => {
 };
 
 describe('pickSlice', () => {
+  it.each(Array.from({ length: 11 }, (_, i) => i + 2))('divides all directions into %i equal spokes', count => {
+    const pick = (deg: number) => pickSlice(200 * Math.sin(deg * Math.PI / 180), -200 * Math.cos(deg * Math.PI / 180), 86, count);
+    const angle = 360 / count;
+    for (let i = 0; i < count; i++) {
+      expect(pick(i * angle)).toBe(i);
+      expect(pick((i + 0.5) * angle - 0.001)).toBe(i);
+      expect(pick((i + 0.5) * angle + 0.001)).toBe((i + 1) % count);
+    }
+    expect(pickSlice(0, 0, 86, count)).toBe(-1);
+    expect(pick(-0.01)).toBe(0);
+  });
   it('maps the 8 compass directions to slices 0..7 clockwise from N', () => {
     expect([0, 45, 90, 135, 180, 225, 270, 315].map((d) => at(d))).toEqual([0, 1, 2, 3, 4, 5, 6, 7]);
   });

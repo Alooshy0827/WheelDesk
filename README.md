@@ -1,6 +1,6 @@
 # WheelDesk
 
-[简体中文](README.zh-CN.md) · Internal beta 0.1.1
+[简体中文](README.zh-CN.md) · Internal beta 0.1.2
 
 A desktop action wheel for everyday tools, AI instructions, and local workflows. Hold Alt (Option on macOS), drag, and release on an action. Move back into the center, press Escape, or right-click to cancel.
 
@@ -11,7 +11,7 @@ Based on [lolPing](https://github.com/darrenprx/lolPing), revision `c97fe772b985
 The settings UI is modified directly from lolPing: its Fluent controls, platform themes, scroll navigation, grouped rows and drag-and-drop wheel editor are reused.
 
 - Original wheel visuals and effects: hover glow/scale, expanding rings, pop/bobbing and All In collision, with original sounds. Each effect is paired with an independent custom function; previewing effects runs no function.
-- Multiple editable eight-slot wheels; switch in the tray or with a wheel action.
+- Multiple editable wheels with 2–12 spokes each (default 8). Shrinking hides the last slots and expanding restores their bindings; switch in the tray or with a wheel action.
 - Keyboard shortcuts, applications, files, folders, URLs, clipboard operations and region screenshots.
 - OpenAI-compatible and Anthropic APIs, including local endpoints. Choose a model and instruction per action.
 - Streamed answer cards with copy and guarded fill-back. Text actions do not automatically send screenshots.
@@ -28,7 +28,7 @@ Open the DMG and drag WheelDesk to Applications. This internal build is ad-hoc s
 1. Open WheelDesk. In Settings, open Accessibility settings and allow WheelDesk, then use **Retry input helper**. Rebuilding an ad-hoc-signed app may require removing its old Accessibility entry and granting access again.
 2. Grant Screen Recording when using screenshots. Screen capture stays off until you choose a screenshot action.
 3. In Models, add a base URL, model ID and optional API key. Configuration edits save automatically; save the key with its separate button. A successful model-list check does not guarantee image support.
-4. In Wheels, drag original effects between positions, then choose each slot’s function in **Bind custom functions**. Swapping effects moves their functions with them; replacing an effect keeps the slot’s function. Click a palette tile to preview it without running its function. Empty function slots do nothing. Size, duration, volume and mute are configurable. Changes save automatically; use the tray to switch wheels.
+4. In Wheels, choose the spoke count, then drag original effects between positions, then choose each slot’s function in **Bind custom functions**. Swapping effects moves their functions with them; replacing an effect keeps the slot’s function. Click a palette tile to preview it without running its function. Empty function slots do nothing. Size, duration, volume and mute are configurable. Changes save automatically; use the tray to switch wheels.
 5. To test an action from settings, click Run and switch to the target application within the three-second countdown.
 
 A text action with no readable selection asks for input; it never silently sends the clipboard. Result cards do not activate the app while streaming. Fill-back requires the original window and selection; when they changed, copy the answer instead.

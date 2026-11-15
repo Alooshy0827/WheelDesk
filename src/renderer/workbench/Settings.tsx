@@ -2,7 +2,8 @@ import { Button, Dropdown, FluentProvider, Input, Option, Textarea, webDarkTheme
 import { Add24Regular, Apps24Regular, ArrowMove24Regular, ArrowSync24Regular, Copy24Regular, Cursor24Regular, DataPie24Regular, Delete24Regular, Info24Regular, LocalLanguage24Regular, Play24Regular, Power24Regular, Rocket24Regular, Settings24Regular, ShieldKeyhole24Regular, Sparkle24Regular, ResizeLarge24Regular, Timer24Regular, Speaker224Regular, SpeakerMute24Regular, MusicNote224Regular } from '@fluentui/react-icons';
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import type { DeskCommand, DeskReply, DeskState } from '../../shared/ipc';
-import { ACTION_KINDS, INPUT_SOURCES, defaultWorkbench, newAction, setWheelEffects, validateWorkflow, type ActionDefinition, type ActionKind, type InputSource, type WorkbenchSettings } from '../../shared/actions';
+import { ACTION_KINDS, INPUT_SOURCES, defaultWorkbench, newAction, resizeWheel, setWheelEffects, validateWorkflow, type ActionDefinition, type ActionKind, type InputSource, type WorkbenchSettings } from '../../shared/actions';
+import { WHEEL_SLOT_LIMITS } from '../../shared/geometry';
 import { keyboardTriggers, triggerLabel, type Settings, type TriggerKey } from '../../shared/settings';
 import { deskError, deskText, strings } from '../../shared/i18n';
 import { ExpanderRow, OnOffSwitch, SettingRow, SliderRow, SwitchRow } from '../settings/components/rows';
@@ -113,6 +114,8 @@ export function SettingsApp() {
   const remove = (fn: () => void) => { if (window.confirm(t.confirmDelete)) fn(); };
   const source = (value: InputSource, onChange: (s: InputSource) => void, previous = true) => <Choice label={t.input} value={value} options={INPUT_SOURCES.filter(i => previous || i !== 'previous').map(id => ({ id, name: t.source[id] }))} onChange={v => onChange(v as InputSource)}/>;
   const wheel = wb.wheels.find(w => w.id === wheelId) ?? wb.wheels.find(w => w.id === wb.activeWheelId) ?? wb.wheels[0];
+  const effects = wheel.effects.slice(0, wheel.slotCount);
+  const slotLabels = effects.map((_, i) => wheel.slotCount === 8 ? upstream.slotNames[i] : `${t.slot} ${i + 1}`);
   const action = wb.actions.find(a => a.id === actionId) ?? wb.actions[0];
   const flow = wb.workflows.find(f => f.id === flowId) ?? wb.workflows[0];
   const profile = wb.profiles.find(p => p.id === profileId) ?? wb.profiles[0];
@@ -139,19 +142,24 @@ export function SettingsApp() {
         <SliderRow icon={<ArrowMove24Regular/>} limit="dragThresholdPx" title={upstream.dragDistance} description={upstream.dragDistanceDesc} value={draft.dragThresholdPx} format={v => `${v} ${state.platform === 'mac' ? 'pt' : 'px'}`} onChange={v => changeSettings({ dragThresholdPx: v })} dim={off}/>
         <SwitchRow icon={<Power24Regular/>} title={t.enabled} checked={draft.enabledOnStart} onChange={v => changeSettings({ enabledOnStart: v })}/>
         <div className="section" id="wheels">{t.wheels}</div>
-        <SettingRow icon={<DataPie24Regular/>} title={t.wheels} description={t.wheelSlotsHelp}><Choice label={t.wheels} value={wheel.id} options={wb.wheels.map(w => ({ id: w.id, name: name(w) }))} onChange={setWheelId}/><Button icon={<Add24Regular/>} aria-label={t.newWheel} onClick={() => { const id = uid(); edit({ wheels: [...wb.wheels, { id, name: t.newWheel, nameEn: t.newWheel, slots: Array(8).fill(null), effects: [...DEFAULT_WHEEL] }] }); setWheelId(id); }}/></SettingRow>
+        <SettingRow icon={<DataPie24Regular/>} title={t.wheels} description={t.wheelSlotsHelp}><Choice label={t.wheels} value={wheel.id} options={wb.wheels.map(w => ({ id: w.id, name: name(w) }))} onChange={setWheelId}/><Button icon={<Add24Regular/>} aria-label={t.newWheel} onClick={() => { const id = uid(); edit({ wheels: [...wb.wheels, { id, name: t.newWheel, nameEn: t.newWheel, slotCount: 8, slots: Array(8).fill(null), effects: [...DEFAULT_WHEEL] }] }); setWheelId(id); }}/></SettingRow>
         <ExpanderRow icon={<Settings24Regular/>} title={name(wheel)} control={<div className="wdButtons"><Button icon={<Copy24Regular/>} onClick={() => { const id = uid(); edit({ wheels: [...wb.wheels, { ...structuredClone(wheel), id, name: wheel.name + ' 2', nameEn: wheel.nameEn + ' 2' }] }); setWheelId(id); }}>{t.duplicate}</Button><Button icon={<Delete24Regular/>} disabled={wb.wheels.length <= 1} onClick={() => remove(() => { edit({ wheels: wb.wheels.filter(w => w.id !== wheel.id) }); setWheelId(''); })}>{t.remove}</Button><Button appearance="primary" disabled={wb.activeWheelId === wheel.id} onClick={() => edit({ activeWheelId: wheel.id })}>{wb.activeWheelId === wheel.id ? t.active : t.activate}</Button></div>}><div className="expPane"><div className="mateFields"><span>{t.name}</span><DraftInput key={wheel.id + 'name'} value={wheel.name} maxLength={80} onSave={v => edit({ wheels: wb.wheels.map(w => w.id === wheel.id ? { ...w, name: v } : w) })}/><span>{t.nameEn}</span><DraftInput key={wheel.id + 'en'} value={wheel.nameEn} maxLength={80} onSave={v => edit({ wheels: wb.wheels.map(w => w.id === wheel.id ? { ...w, nameEn: v } : w) })}/></div></div></ExpanderRow>
-        <WheelEditor key={wheel.id} wheel={wheel.effects} center="generic" centerOn={false} centerEditable={false} centerLabel={t.cancel} trigger={triggerLabel(draft.trigger, state.lang, state.platform)}
+        <SettingRow icon={<DataPie24Regular/>} title={t.spokeCount} description={t.spokeCountHelp}>
+          <Choice label={t.spokeCount} value={String(wheel.slotCount)}
+            options={Array.from({ length: WHEEL_SLOT_LIMITS.max - WHEEL_SLOT_LIMITS.min + 1 }, (_, i) => { const n = WHEEL_SLOT_LIMITS.min + i; return { id: String(n), name: t.spokes(n) }; })}
+            onChange={value => edit({ wheels: wb.wheels.map(w => w.id === wheel.id ? resizeWheel(w, Number(value)) : w) })}/>
+        </SettingRow>
+        <WheelEditor key={`${wheel.id}-${wheel.slotCount}`} wheel={effects} slotLabels={slotLabels} center="generic" centerOn={false} centerEditable={false} centerLabel={t.cancel} trigger={triggerLabel(draft.trigger, state.lang, state.platform)}
           pool={ALL_PINGS.map(p => ({ id: p.id, name: upstream.pingNames[p.id], icon: textureUrl(p.icon) }))}
-          defaults={{ wheel: DEFAULT_WHEEL, center: 'generic' }}
+          defaults={{ wheel: ALL_PINGS.slice(0, wheel.slotCount).map(p => p.id), center: 'generic' }}
           labels={{ title: t.wheelPreview, desc: t.effectBindingHelp, poolTitle: t.originalEffects, poolDesc: t.effectPoolHelp }}
           onChange={p => { if (p.wheel) edit({ wheels: wb.wheels.map(w => w.id === wheel.id ? setWheelEffects(w, p.wheel ?? w.effects) : w) }); }}
           onPreview={effect => { void flush().then(ok => { if (ok) void invoke({ type: 'previewEffect', effect }); }); }}/>
         <div className="card mate wdBindings"><div className="mateHead"><b>{t.bindActions}</b></div><span className="desc">{t.effectBindingHelp}</span>
-          {wheel.effects.map((effect, i) => <div className="wdBinding" key={i}>
+          {effects.map((effect, i) => <div className="wdBinding" key={i}>
             <img src={textureUrl(ALL_PINGS.find(p => p.id === effect)?.icon ?? FALLBACK_TEXTURE)} alt=""/>
-            <div><b>{upstream.slotNames[i]}</b><span className="desc">{upstream.pingNames[effect]}</span></div>
-            <Choice label={`${upstream.slotNames[i]} · ${t.action}`} value={wheel.slots[i] ?? ''}
+            <div><b>{slotLabels[i]}</b><span className="desc">{upstream.pingNames[effect]}</span></div>
+            <Choice label={`${slotLabels[i]} · ${t.action}`} value={wheel.slots[i] ?? ''}
               options={[{ id: '', name: t.empty }, ...wb.actions.map(a => ({ id: a.id, name: name(a) }))]}
               onChange={id => edit({ wheels: wb.wheels.map(w => w.id === wheel.id ? { ...w, slots: w.slots.map((v, j) => i === j ? id || null : v) } : w) })}/>
           </div>)}

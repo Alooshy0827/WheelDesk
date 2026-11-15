@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { DeskOverlay, DeskState } from '../../src/shared/ipc';
 import { DEFAULT_SETTINGS } from '../../src/shared/settings';
-import { idleRun } from '../../src/shared/actions';
+import { idleRun, resizeWheel } from '../../src/shared/actions';
 import { DesktopSurfaces } from '../../src/main/workbench/surfaces';
 
 const h = vi.hoisted(() => ({
@@ -57,6 +57,27 @@ beforeEach(() => {
 });
 
 describe('original effects with custom functions', () => {
+  it.each([2, 3, 4, 6, 9, 12])('snapshots %i active spokes and ignores a later count change', async count => {
+    const wheel = resizeWheel(state.settings.workbench.wheels[0], count);
+    wheel.slots[count - 1] = 'copy';
+    state.settings.workbench.wheels[0] = wheel;
+    await gesture();
+    expect(events().find(e => e.type === 'open')?.effects).toHaveLength(count);
+    expect(events().find(e => e.type === 'open')?.labels).toHaveLength(count);
+    state.settings.workbench.wheels[0] = resizeWheel(wheel, count === 2 ? 12 : 2);
+    const rad = (count - 1) * 2 * Math.PI / count;
+    release(Math.round(500 + 200 * Math.sin(rad)), Math.round(500 - 200 * Math.cos(rad)));
+    expect(chosen).toHaveBeenCalledExactlyOnceWith('copy', { x: 500, y: 500 });
+    expect(effects()[0]?.effect).toBe(wheel.effects[count - 1]);
+  });
+  it('opens newly added spokes empty until a function is explicitly assigned', async () => {
+    state.settings.workbench.wheels[0] = resizeWheel(state.settings.workbench.wheels[0], 12);
+    await gesture();
+    expect(events().find(e => e.type === 'open')?.enabled?.slice(8)).toEqual([false, false, false, false]);
+    release(300, 500); // W is spoke 9 on a 12-spoke wheel, one of the new empty slots.
+    expect(chosen).not.toHaveBeenCalled();
+    expect(effects()).toHaveLength(0);
+  });
   it('plays the selected effect and executes its independently bound action exactly once', async () => {
     state.settings.workbench.wheels[0].effects[0] = 'allin';
     await gesture(); release(); release();

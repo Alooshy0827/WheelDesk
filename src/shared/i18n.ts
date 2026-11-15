@@ -1721,6 +1721,8 @@ const TABLES: Record<Platform, Record<Lang, Strings>> = {
 export const strings = (lang: Lang, platform: Platform = 'win'): Strings => TABLES[platform][lang];
 
 const deskEn = {
+  spokeCount: 'Spoke count', spokes: (n: number) => `${n} spokes`,
+  spokeCountHelp: '2–12 slots per wheel. Reducing the count hides the last slots; increasing it restores their bindings.',
   originalEffects: 'Original effects', bindActions: 'Bind custom functions',
   effectBindingHelp: 'Each slot plays its original effect and runs the function bound below. Empty slots do neither.',
   effectPoolHelp: 'Click to preview the original effect. Drag to replace a slot; moving a slot moves its function too.',
@@ -1755,7 +1757,7 @@ const deskEn = {
   trigger: 'Trigger key', accessibility: 'Open Accessibility settings', screenPermission: 'Open Screen Recording settings',
   retry: 'Retry input helper', helper: 'Input helper', permissionsHint: 'On macOS, allow Accessibility for gestures and Screen Recording for screenshots.',
   data: 'Open data folder', privacy: 'Only your configured provider receives AI requests. Keys are encrypted locally. No automatic updates or cloud sync.',
-  about: 'WheelDesk 0.1.1 · Internal beta', preview: 'Preview gesture', confirmDelete: 'Delete this item?',
+  about: 'WheelDesk 0.1.2 · Internal beta', preview: 'Preview gesture', confirmDelete: 'Delete this item?',
   kind: { shortcut: 'Keyboard shortcut', openApp: 'Open application', openPath: 'Open folder / file', openUrl: 'Open URL',
     readClipboard: 'Read clipboard', writeClipboard: 'Write clipboard', pasteText: 'Paste plain text', screenshot: 'Capture region',
     ai: 'AI instruction', script: 'Run script', delay: 'Wait (milliseconds)', switchWheel: 'Switch wheel', workflow: 'Run workflow' },
@@ -1781,6 +1783,8 @@ const deskEn = {
   },
 };
 const deskZh: typeof deskEn = {
+  spokeCount: '辐数', spokes: (n: number) => `${n} 辐`,
+  spokeCountHelp: '每套轮盘可设为 2～12 辐。减少时只隐藏末尾格子，增加后恢复原有绑定。',
   originalEffects: '原版特效', bindActions: '绑定自定义功能',
   effectBindingHelp: '每个位置播放原版特效，同时执行下方绑定的功能。未绑定的位置不播放、不执行。',
   effectPoolHelp: '点击预览原版特效，拖动可替换位置；交换位置时，绑定的功能会一起移动。',
@@ -1815,7 +1819,7 @@ const deskZh: typeof deskEn = {
   trigger: '触发键', accessibility: '打开辅助功能设置', screenPermission: '打开屏幕录制设置',
   retry: '重新连接输入助手', helper: '输入助手', permissionsHint: 'macOS 需要辅助功能权限来识别手势，截图需要屏幕录制权限。',
   data: '打开数据目录', privacy: 'AI 请求仅发送给你配置的服务商。密钥在本机加密保存，不自动更新或同步到云端。',
-  about: 'WheelDesk 0.1.1 · 内测版', preview: '预览手势', confirmDelete: '删除此项目？',
+  about: 'WheelDesk 0.1.2 · 内测版', preview: '预览手势', confirmDelete: '删除此项目？',
   kind: { shortcut: '发送快捷键', openApp: '打开应用', openPath: '打开文件夹 / 文件', openUrl: '打开网址',
     readClipboard: '读取剪贴板', writeClipboard: '写入剪贴板', pasteText: '纯文本粘贴', screenshot: '区域截图',
     ai: 'AI 指令', script: '运行脚本', delay: '等待（毫秒）', switchWheel: '切换轮盘', workflow: '运行工作流' },

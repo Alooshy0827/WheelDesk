@@ -24,6 +24,7 @@ class FakeElement {
   append(child: FakeElement): void {
     this.children.push(child);
   }
+  replaceChildren(): void { this.children.length = 0; }
 }
 
 function makeWheel(id = 'wheel') {
@@ -43,6 +44,33 @@ afterEach(() => {
 });
 
 describe('wheel size', () => {
+  it.each([2, 3, 4, 5, 6, 7, 9, 10, 11, 12])('aligns %i rendered spokes, hover and selection across scales', count => {
+    const { wheel, svg, hover } = makeWheel();
+    wheel.setItems(Array.from({ length: count }, (_, i) => ({ key: String(i), icon: `${i}.png` })));
+    expect(svg.children.filter(c => c.attrs.get('class') === 'icon')).toHaveLength(count);
+    expect(svg.children.filter(c => c.attrs.get('class') === 'wedge')).toHaveLength(count);
+    for (const size of [300, 600, 900]) {
+      wheel.setSize(size);
+      for (let i = 0; i < count; i++) {
+        const rad = i * 2 * Math.PI / count, radius = WHEEL.iconR * size / WHEEL.size;
+        const x = 800 + Math.sin(rad) * radius, y = 500 - Math.cos(rad) * radius;
+        wheel.open(800, 500); wheel.move(x, y);
+        expect(hover).toHaveBeenLastCalledWith(i);
+        expect(wheel.release(x, y)?.key).toBe(String(i));
+      }
+    }
+  });
+  it('rebuilds different wheel counts without retaining old graphics or selection', () => {
+    const { wheel, svg } = makeWheel();
+    for (const count of [12, 3, 8, 2]) {
+      wheel.setItems(Array.from({ length: count }, (_, i) => ({ key: String(i), icon: `${i}.png` })));
+      wheel.open(800, 500); wheel.move(800, 350);
+      expect(svg.children.filter(c => c.classes.has('hot'))).toHaveLength(1);
+      expect(svg.children.filter(c => c.attrs.get('class') === 'icon')).toHaveLength(count);
+      wheel.cancel();
+      expect(svg.children.some(c => c.classes.has('hot'))).toBe(false);
+    }
+  });
   it.each(['wheel', 'emoteWheel'])('resizes %s around its original centre', (id) => {
     const { wheel, svg } = makeWheel(id);
     wheel.open(800, 500);

@@ -1,4 +1,4 @@
-import { WHEEL, pickSlice } from '../../shared/geometry';
+import { WHEEL, pickSlice, normalizeSlotCount } from '../../shared/geometry';
 import { WHEEL_SLOTS } from '../../shared/pings';
 
 const NS = 'http://www.w3.org/2000/svg';
@@ -64,6 +64,8 @@ export class Wheel {
 
   /** Changes what each slice holds, top (N) then clockwise. */
   setItems(items: readonly WheelItem[]): void {
+    const count = normalizeSlotCount(items.length);
+    if (count !== this.icons.length) this.build(count);
     this.items = items;
     this.icons.forEach((icon, i) => {
       const item = items[i];
@@ -119,13 +121,13 @@ export class Wheel {
   }
 
   move(x: number, y: number): void {
-    if (this.opened) this.setHot(pickSlice(x - this.ox, y - this.oy, WHEEL.innerR * this.scale));
+    if (this.opened) this.setHot(pickSlice(x - this.ox, y - this.oy, WHEEL.innerR * this.scale, this.icons.length));
   }
 
   /** Closes the wheel. Returns the chosen item's key at the wheel centre, or null when released in the dead zone. */
   release(x: number, y: number): { key: string; x: number; y: number } | null {
     if (!this.opened) return null;
-    const slice = pickSlice(x - this.ox, y - this.oy, WHEEL.innerR * this.scale);
+    const slice = pickSlice(x - this.ox, y - this.oy, WHEEL.innerR * this.scale, this.icons.length);
     this.close();
     const item = slice >= 0 ? this.items[slice] : undefined;
     return item ? { key: item.key, x: this.ox, y: this.oy } : null;
@@ -162,9 +164,13 @@ export class Wheel {
     this.centerTxt.textContent = label ? fitLabel(label) : this.idleLabel ?? this.centerLabel;
   }
 
-  private build(): void {
+  private build(count: number = WHEEL_SLOTS): void {
     const { innerR, outerR, extR, iconR, iconSize } = WHEEL;
     const svg = this.svg;
+    svg.replaceChildren();
+    this.wedges.length = 0;
+    this.icons.length = 0;
+    this.hot = -1;
     const id = `lp-${svg.id}`;
     el('defs', {}, svg).innerHTML = `
       <radialGradient id="${id}-ext" cx="0" cy="0" r="${extR}" gradientUnits="userSpaceOnUse">
@@ -177,22 +183,24 @@ export class Wheel {
       <radialGradient id="${id}-core" cx="0" cy="-10" r="${innerR}" gradientUnits="userSpaceOnUse">
         <stop offset="0" stop-color="#2c5d60"/><stop offset="1" stop-color="#11292c"/></radialGradient>`;
 
-    const slots = [...Array(WHEEL_SLOTS).keys()];
+    const slots = [...Array(count).keys()];
+    const angle = 360 / count;
+    const extended = (i: number): boolean => (i * 4) % count === 0;
     slots.forEach((i) => {
-      const mid = -90 + i * 45;
-      if (i % 2 === 0) el('path', { d: sector(outerR, extR, mid - 22.5, mid + 22.5), fill: `url(#${id}-ext)` }, svg);
+      const mid = -90 + i * angle;
+      if (extended(i)) el('path', { d: sector(outerR, extR, mid - angle / 2, mid + angle / 2), fill: `url(#${id}-ext)` }, svg);
     });
     el('circle', { r: (innerR + outerR) / 2, fill: 'none', stroke: `url(#${id}-ring)`, 'stroke-width': outerR - innerR, opacity: 0.92 }, svg);
     slots.forEach((i) => {
-      const mid = -90 + i * 45;
-      const reach = i % 2 === 0 ? extR : outerR;
-      this.wedges.push(el('path', { d: sector(innerR, reach, mid - 22.5, mid + 22.5), fill: `url(#${id}-hot)`, 'fill-opacity': 0, class: 'wedge' }, svg));
-      const [x0, y0] = polar(innerR, mid - 22.5);
-      const [x1, y1] = polar(outerR, mid - 22.5);
+      const mid = -90 + i * angle;
+      const reach = extended(i) ? extR : outerR;
+      this.wedges.push(el('path', { d: sector(innerR, reach, mid - angle / 2, mid + angle / 2), fill: `url(#${id}-hot)`, 'fill-opacity': 0, class: 'wedge' }, svg));
+      const [x0, y0] = polar(innerR, mid - angle / 2);
+      const [x1, y1] = polar(outerR, mid - angle / 2);
       el('line', { x1: x0, y1: y0, x2: x1, y2: y1, stroke: '#a08a5c', 'stroke-opacity': 0.45, 'stroke-width': 1.2 }, svg);
     });
     slots.forEach((i) => {
-      const [ix, iy] = polar(iconR, -90 + i * 45);
+      const [ix, iy] = polar(iconR, -90 + i * angle);
       this.icons.push(el('image', { x: ix - iconSize / 2, y: iy - iconSize / 2, width: iconSize, height: iconSize, class: 'icon' }, svg));
     });
 

@@ -20,3 +20,6 @@ smoke-data/
 .env
 .env.*
 !.env.example
+
+# Hidden macOS packaging staging; do not leave indexed test app copies
+.packaging/

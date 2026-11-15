@@ -95,17 +95,19 @@ export class DesktopSurfaces {
       if (!wheel) return;
       this.cancel();
       const serial = ++this.serial;
-      const items = wheel.slots.map(id => wb.actions.find(a => a.id === id));
+      const slots = wheel.slots.slice(0, wheel.slotCount);
+      const effects = wheel.effects.slice(0, wheel.slotCount);
+      const items = slots.map(id => wb.actions.find(a => a.id === id));
       const labels = items.map(a => a ? lang === 'en' ? a.nameEn || a.name : a.name : '');
       const visual = this.visual();
-      this.gesture = { serial, displayId: p.display.id, origin: { x: p.x, y: p.y }, slots: [...wheel.slots],
-        labels, effects: [...wheel.effects], visual };
+      this.gesture = { serial, displayId: p.display.id, origin: { x: p.x, y: p.y }, slots,
+        labels, effects, visual };
       this.opened({ x: event.x, y: event.y });
       void this.ready.get(p.display.id)?.then(() => {
         if (this.gesture?.serial !== serial) return;
         this.send(p.display.id, { type: 'open', x: p.x - p.display.dip.x, y: p.y - p.display.dip.y,
           name: lang === 'en' ? wheel.nameEn || wheel.name : wheel.name, lang,
-          labels, effects: [...wheel.effects], enabled: items.map(a => !!a), visual });
+          labels, effects, enabled: items.map(a => !!a), visual });
         this.overlays.get(p.display.id)?.showInactive();
       });
       return;
@@ -117,7 +119,7 @@ export class DesktopSurfaces {
     if (!p || !map) { this.cancel(); return; }
     if (event.type === 'wheelMove') this.send(g.displayId, { type: 'move', x: p.x - map.dip.x, y: p.y - map.dip.y });
     else {
-      const index = pickSlice(p.x - g.origin.x, p.y - g.origin.y, WHEEL.innerR * g.visual.wheelSizePx / WHEEL.size);
+      const index = pickSlice(p.x - g.origin.x, p.y - g.origin.y, WHEEL.innerR * g.visual.wheelSizePx / WHEEL.size, g.slots.length);
       const actionId = index >= 0 ? g.slots[index] : null;
       this.cancel();
       if (actionId) {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { defaultWorkbench, newAction, normalizeWorkbench, parseShortcut, setWheelEffects, validateWorkflow } from '../../src/shared/actions';
+import { defaultWorkbench, newAction, normalizeWorkbench, parseShortcut, resizeWheel, setWheelEffects, validateWorkflow } from '../../src/shared/actions';
 import { DEFAULT_WHEEL } from '../../src/shared/pings';
 
 describe('workbench configuration', () => {
@@ -26,11 +26,12 @@ describe('workbench configuration', () => {
     expect(settings.actions[0].timeoutS).toBe(30);
     expect(settings.actions[0]).not.toHaveProperty('command');
   });
-  it('removes duplicate ids and limits a wheel to eight slots', () => {
+  it('removes duplicate ids and bounds wheel storage at twelve slots', () => {
     const a = newAction('a', 'ai');
     const s = normalizeWorkbench({ actions: [a, a], wheels: [{ id: 'w', slots: Array(20).fill('a') }] });
     expect(s.actions).toHaveLength(1);
-    expect(s.wheels[0].slots).toHaveLength(8);
+    expect(s.wheels[0].slots).toHaveLength(12);
+    expect(s.wheels[0].slotCount).toBe(8);
   });
   it('never turns an oversized script into a different executable program by truncation', () => {
     const source = 'echo unsafe;'.repeat(2000);
@@ -69,6 +70,37 @@ describe('workbench configuration', () => {
     const reset = setWheelEffects(replaced, DEFAULT_WHEEL);
     expect(reset.effects).toEqual(DEFAULT_WHEEL);
     expect(reset.slots).toEqual(wheel.slots);
+  });
+  it('migrates older configurations to eight spokes without changing bindings', () => {
+    const wb = defaultWorkbench();
+    const wheels = wb.wheels.map(({ slotCount: _, ...w }) => w);
+    expect(normalizeWorkbench({ ...wb, wheels })).toEqual(wb);
+  });
+  it('persists hidden bindings and restores them after shrinking and expanding', () => {
+    const wb = defaultWorkbench();
+    const original = resizeWheel(wb.wheels[0], 12);
+    original.slots[11] = 'copy';
+    const saved = normalizeWorkbench(JSON.parse(JSON.stringify({ ...wb, wheels: [resizeWheel(original, 3)] })));
+    expect(saved.wheels[0].slotCount).toBe(3);
+    expect(resizeWheel(saved.wheels[0], 12)).toEqual(original);
+    expect(saved.wheels[0].slots.slice(8, 11)).toEqual([null, null, null]);
+  });
+  it('reorders only visible bindings and preserves hidden functions when reusing their artwork', () => {
+    const wheel = resizeWheel(defaultWorkbench().wheels[0], 4);
+    const changed = setWheelEffects(wheel, ['assist', 'omw', 'push', 'allin']);
+    expect(changed.slots.slice(0, 4)).toEqual(['copy', 'selectAll', 'paste', 'undo']);
+    expect(changed.slots.slice(4)).toEqual(wheel.slots.slice(4));
+    expect(new Set(changed.effects).size).toBe(changed.effects.length);
+    expect(changed.slotCount).toBe(4);
+    expect(setWheelEffects(changed, DEFAULT_WHEEL.slice(0, 4)).slots.slice(4)).toEqual(wheel.slots.slice(4));
+  });
+  it.each([[0, 2], [99, 12], [5.6, 6], [NaN, 8], ['12', 8]])('repairs spoke count %s to %s', (raw, count) => {
+    const wb = defaultWorkbench();
+    const s = normalizeWorkbench({ ...wb, wheels: [{ ...wb.wheels[0], slotCount: raw }] });
+    expect(s.wheels[0].slotCount).toBe(count);
+    expect(s.wheels[0].effects.length).toBeGreaterThanOrEqual(Number(count));
+    expect(s.wheels[0].effects.length).toBe(s.wheels[0].slots.length);
+    expect(s.wheels[0].slots.slice(0, 8)).toEqual(wb.wheels[0].slots);
   });
 });
 describe('workflow validation', () => {

@@ -62,11 +62,40 @@ app.whenReady().then(async () => {
   await win.webContents.executeJavaScript(`document.querySelector('[role="option"]').click()`);
   await until(async () => (await invoke({type:'state'})).state.settings.workbench.wheels[0].slots[0] === null, 'wheel editor clears and autosaves slot');
   assert.equal((await invoke({ type: 'save', settings })).ok, true);
+  const countWheels = new Map();
+  async function chooseCount(count) {
+    await win.webContents.executeJavaScript(`document.querySelector('[role="combobox"][aria-label="辐数"]').click()`);
+    await until(() => win.webContents.executeJavaScript(`Boolean([...document.querySelectorAll('[role="option"]')].find(o => o.textContent === '${count} 辐'))`), 'spoke count options');
+    await win.webContents.executeJavaScript(`[...document.querySelectorAll('[role="option"]')].find(o => o.textContent === '${count} 辐').click()`);
+    await until(async () => (await invoke({type:'state'})).state.settings.workbench.wheels[0].slotCount === count, `persist ${count} spokes`);
+    await until(() => win.webContents.executeJavaScript(`document.querySelectorAll('.weSlot').length === ${count} && document.querySelectorAll('.wdBinding').length === ${count}`), `render ${count} spokes`);
+    countWheels.set(count, (await invoke({type:'state'})).state.settings.workbench.wheels[0]);
+  }
+  await chooseCount(12);
+  await win.webContents.executeJavaScript(`document.querySelectorAll('.wdBinding [role="combobox"]')[11].click()`);
+  await until(() => win.webContents.executeJavaScript('Boolean(document.querySelector("[role=option]"))'), 'new spoke binding options');
+  await win.webContents.executeJavaScript(`[...document.querySelectorAll('[role="option"]')].find(o => o.textContent === '复制').click()`);
+  await until(async () => (await invoke({type:'state'})).state.settings.workbench.wheels[0].slots[11] === 'copy', 'save twelfth binding');
+  await chooseCount(3);
+  await new Promise(resolve => { win.webContents.once('did-finish-load', resolve); win.webContents.reload(); });
+  await until(() => win.webContents.executeJavaScript('document.querySelectorAll(".weSlot").length === 3'), 'reload saved count');
+  await win.webContents.executeJavaScript(`document.querySelector('[data-section="wheels"]').click()`);
+  await pause(600);
+  for (const count of [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]) {
+    await chooseCount(count);
+    if (count === 6 || count === 12) writeFileSync(join(smokeDir, `wheel-editor-${count}.png`), (await win.webContents.capturePage()).toPNG());
+  }
+  const counted = (await invoke({type:'state'})).state.settings.workbench;
+  assert.equal(counted.wheels[0].slots[11], 'copy');
+  assert.deepEqual(counted.wheels[0].slots.slice(0, 8), settings.workbench.wheels[0].slots);
+  assert.equal(counted.wheels[1].slotCount, 8);
+  assert.equal((await invoke({ type: 'save', settings })).ok, true);
+  await until(() => win.webContents.executeJavaScript('document.querySelectorAll(".weSlot").length === 8'), 'restore eight-spoke fixture');
   nativeTheme.themeSource = 'dark'; await pause(500);
   writeFileSync(join(smokeDir, 'wheel-editor-dark.png'), (await win.webContents.capturePage()).toPNG());
   nativeTheme.themeSource = 'light';
 
-  // Real renderer, production custom origin, unchanged upstream Wheel/PingFx/SoundBank code.
+  // Real renderer, production custom origin and upstream effects with dynamic wheel geometry.
   const beforePreview = (await invoke({type:'state'})).state.run;
   assert.equal((await invoke({type:'previewEffect', effect:'invalid'})).ok, false);
   assert.equal((await invoke({type:'previewEffect', effect:'allin'})).ok, true);
@@ -107,6 +136,20 @@ app.whenReady().then(async () => {
   sendOverlay({type:'move',x:360,y:330});
   await until(() => overlayJS('document.querySelectorAll("#wheel .icon.hot").length === 0'), 'original center cancel zone');
   sendOverlay({type:'close',clear:true});
+  for (const [count, savedWheel] of countWheels) {
+    const activeSlots = savedWheel.slots.slice(0, count);
+    sendOverlay({type:'open',x:360,y:330,effects:savedWheel.effects.slice(0,count),enabled:activeSlots.map(Boolean),
+      labels:activeSlots.map(id => settings.workbench.actions.find(a => a.id === id)?.name ?? ''),name:`${count} 辐轮盘`,visual});
+    await until(() => overlayJS(`document.querySelectorAll('#wheel .icon').length === ${count} && document.querySelectorAll('#wheel .wedge').length === ${count}`), `${count}-spoke overlay`);
+    const rad = (count - 1) * 2 * Math.PI / count;
+    sendOverlay({type:'move',x:360+200*Math.sin(rad),y:330-200*Math.cos(rad)});
+    await until(() => overlayJS(`document.querySelectorAll('#wheel .icon')[${count-1}].classList.contains('hot')`), `${count}-spoke hit alignment`);
+    if (count === 6 || count === 12) {
+      await pause(160);
+      writeFileSync(join(smokeDir, `wheel-${count}.png`), (await overlay.webContents.capturePage({x:0,y:0,width:720,height:660})).toPNG());
+    }
+    sendOverlay({type:'close',clear:true});
+  }
   for (const [i, effect] of ['danger','push','omw','allin','assist','needvision','missing','enemyvision','generic','bait','visioncleared','missingflip'].entries()) {
     sendOverlay({type:'effect',effect,x:120+(i%4)*190,y:130+Math.floor(i/4)*190,visual:{...visual,pingSizePx:100,pingDurationS:3.2}});
   }
@@ -148,7 +191,7 @@ app.whenReady().then(async () => {
   await until(async () => { const s = (await invoke({ type: 'state' })).state; return s.run.status === 'completed' && s.run.text === 'script-ok'; }, 'real script action');
   assert.deepEqual(errors, []);
   writeFileSync(join(smokeDir, 'report.json'), JSON.stringify({ passed: true, helper: finished.helper,
-    checks: ['settings mounts', 'upstream six-section navigation', 'original effect/function pairs move and autosave', 'empty function slots', '12 original effects', 'original collision/ring/bobbing animations', '12 sounds fetched and decoded', 'preview does not execute actions', 'original wheel geometry/hover/transition', 'custom function labels', 'idle overlay cleanup', 'light and dark themes', 'Chinese language', 'independent branding', 'model listing', 'text-only AI request', 'no AI tools', 'streamed result', 'usage', 'renderer IPC permissions', 'real script action'], rendererErrors: errors }, null, 2));
+    checks: ['2–12 spokes through real settings UI', 'per-wheel spoke count persistence after reload', 'hidden function restoration', 'dynamic overlay hit alignment', 'settings mounts', 'upstream six-section navigation', 'original effect/function pairs move and autosave', 'empty function slots', '12 original effects', 'original collision/ring/bobbing animations', '12 sounds fetched and decoded', 'preview does not execute actions', 'original wheel geometry/hover/transition', 'custom function labels', 'idle overlay cleanup', 'light and dark themes', 'Chinese language', 'independent branding', 'model listing', 'text-only AI request', 'no AI tools', 'streamed result', 'usage', 'renderer IPC permissions', 'real script action'], rendererErrors: errors }, null, 2));
   console.log('WheelDesk smoke passed', JSON.stringify({ helper: finished.helper }));
   server.close(); app.quit();
 }).catch(error => { console.error(error); if (server) server.close(); app.exit(1); });
