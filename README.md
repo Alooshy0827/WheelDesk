@@ -1,6 +1,6 @@
 # WheelDesk
 
-[简体中文](README.zh-CN.md) · Internal beta 0.1.3
+[简体中文](README.zh-CN.md) · Internal beta 0.1.4
 
 A desktop action wheel for everyday tools, AI instructions, and local workflows. Hold Alt (Option on macOS), drag, and release on an action. Move back into the center, press Escape, or right-click to cancel.
 
@@ -27,7 +27,7 @@ Open the DMG and drag WheelDesk to Applications. This internal build is ad-hoc s
 
 1. Open WheelDesk. In Settings, open Accessibility settings and allow WheelDesk, then use **Retry input helper**. Rebuilding an ad-hoc-signed app may require removing its old Accessibility entry and granting access again.
 2. Grant Screen Recording when using screenshots. Screen capture stays off until you choose a screenshot action.
-3. In Models, choose an OpenAI, Anthropic/Claude, DeepSeek, Qwen, Kimi, Gemini, Ollama or LM Studio preset to fill the protocol and URL, or use Custom. Enter a model ID/key and click **Test connection** for a short text request with elapsed time or a localized error (may incur a small API charge). **Fetch models** is separate. A typed test key is not saved; use **Save key** to persist it. Changing the API endpoint clears the old key. A successful text test does not guarantee image support.
+3. In Models, add a service, choose a provider, enter its key, then choose or type a model. Fetch models offers a searchable list. **Save and test connection** sends a short text request and securely saves a typed key only after success; failed tests preserve the previous key. API format/address are configured automatically and hidden under **Advanced settings** by default. Custom services expose the URL directly; local services usually need no key. Tests may incur a small API charge and do not verify image support.
 4. In Wheels, choose the spoke count, then drag original effects between positions, then choose each slot’s function in **Bind custom functions**. Swapping effects moves their functions with them; replacing an effect keeps the slot’s function. Click a palette tile to preview it without running its function. Empty function slots do nothing. Size, duration, volume and mute are configurable. Changes save automatically; use the tray to switch wheels.
 5. To test an action from settings, click Run and switch to the target application within the three-second countdown.
 

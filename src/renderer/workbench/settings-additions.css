@@ -19,3 +19,7 @@
 
 .wdModelFields { border: 0; padding: 0; margin: 0; min-width: 0; }
 .wdModelSuccess { color: var(--colorPaletteGreenForeground1); font-size: 12px; line-height: 1.5; }
+
+.wdModelPicker { display: flex; gap: 8px; flex-wrap: wrap; }
+.wdModelPicker > .fui-Combobox { flex: 1; min-width: 180px; }
+.wdModelEditor .expander { margin-top: 16px; border: 1px solid var(--stroke); border-radius: 8px; }
