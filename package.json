@@ -1,7 +1,7 @@
 {
   "name": "wheeldesk",
   "productName": "WheelDesk",
-  "version": "0.1.4",
+  "version": "0.1.6",
   "private": true,
   "description": "Configurable desktop action wheels and AI workflows",
   "author": "WheelDesk contributors; based on lolPing by Danrui Meng",
@@ -18,7 +18,8 @@
     "dist": "npm run build:helper && electron-vite build && electron-builder --win --publish never",
     "dist:mac": "npm run build:helper && electron-vite build && electron-builder --mac --arm64 --publish never",
     "dist:win": "npm run build:helper && electron-vite build && electron-builder --win --publish never",
-    "smoke": "electron tools/smoke.cjs"
+    "smoke": "electron tools/smoke.cjs",
+    "setup:mac-signing": "node tools/setup-mac-signing.cjs"
   },
   "devDependencies": {
     "@fluentui/react-components": "9.74.9",
@@ -109,14 +110,6 @@
       "hardenedRuntime": false,
       "extraResources": [
         {
-          "from": "native/hook-helper/build/hook-helper",
-          "to": "hook-helper"
-        },
-        {
-          "from": "native/hook-helper/build/context-helper",
-          "to": "context-helper"
-        },
-        {
           "from": "build/desk",
           "to": ".",
           "filter": [
@@ -127,12 +120,24 @@
       "extendInfo": {
         "NSAccessibilityUsageDescription": "WheelDesk uses Accessibility for wheel gestures and configured keyboard actions.",
         "NSScreenCaptureUsageDescription": "WheelDesk captures only regions you select for screenshots and AI requests."
-      }
+      },
+      "sign": "tools/mac-sign.cjs",
+      "extraFiles": [
+        {
+          "from": "native/hook-helper/build/hook-helper",
+          "to": "Helpers/hook-helper"
+        },
+        {
+          "from": "native/hook-helper/build/context-helper",
+          "to": "Helpers/context-helper"
+        }
+      ]
     },
     "dmg": {
       "artifactName": "WheelDesk-${version}-arm64.dmg"
     },
-    "publish": null
+    "publish": null,
+    "afterAllArtifactBuild": "tools/verify-mac-signing.cjs"
   },
   "engines": {
     "node": ">=22.12.0"

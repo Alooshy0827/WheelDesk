@@ -230,7 +230,7 @@ int runHooks(Output& out) {
       CGEventMaskBit(kCGEventScrollWheel);
   g_tap = CGEventTapCreate(kCGSessionEventTap, kCGHeadInsertEventTap, kCGEventTapOptionDefault, mask, tapCallback, nullptr);
   if (g_tap == nullptr) {
-    out.error("noAccess", "Can't read input: lolPing needs Accessibility permission");
+    out.error("noAccess", "Can't start input: allow WheelDesk in Accessibility settings");
     return kExitNoAccess;
   }
   CFRunLoopRef loop = CFRunLoopGetCurrent();

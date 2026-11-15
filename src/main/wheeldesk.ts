@@ -20,6 +20,7 @@ import { runScript } from './workbench/scripts';
 import { DesktopSurfaces, deskWindow, loadDesk } from './workbench/surfaces';
 import { registerDeskScheme, serveDeskScheme } from './workbench/protocol';
 import { isPingId } from '../shared/pings';
+import { checkInputAccess, PermissionRecovery } from './workbench/permissionRecovery';
 
 const mac = process.platform === 'darwin';
 const platform = mac ? 'mac' : 'win';
@@ -35,6 +36,7 @@ let quitting = false;
 let initialized = false;
 let store: SettingsStore;
 let bridge: InputBridge;
+let permissionRecovery: PermissionRecovery | undefined;
 let context: ContextClient;
 let secrets: SecretStore;
 let surfaces: DesktopSurfaces;
@@ -45,7 +47,7 @@ let requestedInput: { resolve: (text: string) => void; reject: (error: Error) =>
 let starting = false;
 let cardReady: Promise<void> | null = null;
 let hideTimer: NodeJS.Timeout | null = null;
-const helperPath = (name: string) => app.isPackaged ? join(process.resourcesPath, name + (mac ? '' : '.exe'))
+const helperPath = (name: string) => app.isPackaged ? mac ? join(process.resourcesPath, '../Helpers', name) : join(process.resourcesPath, name + '.exe')
   : join(app.getAppPath(), 'native/hook-helper/build', name + (mac ? '' : '.exe'));
 const language = () => resolveLang(store.get().language, app.getLocale());
 const t = () => deskText(language());
@@ -365,6 +367,7 @@ app.on('window-all-closed', () => undefined);
 app.on('before-quit', event => {
   if (quitting || !bridge) return;
   event.preventDefault(); quitting = true;
+  permissionRecovery?.dispose();
   runner.cancel(); surfaces.destroy();
   void Promise.all([bridge.stop(), context.stop(), store.flush()]).finally(() => app.quit());
 });
@@ -403,5 +406,7 @@ void app.whenReady().then(async () => {
   store.on('change', configure);
   initialized = true;
   configure(); bridge.start();
+  if (mac) permissionRecovery = new PermissionRecovery(() => bridge.status,
+    () => checkInputAccess(helperPath('hook-helper')), () => bridge.retry());
   if (!process.argv.includes('--hidden')) await showSettings();
 }).catch(error => { console.error('WheelDesk startup:', error instanceof Error ? error.message : 'failed'); app.quit(); });

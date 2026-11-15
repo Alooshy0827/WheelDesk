@@ -5,6 +5,9 @@
 #include <string>
 
 #include "app.h"
+#ifdef __APPLE__
+#include <ApplicationServices/ApplicationServices.h>
+#endif
 
 namespace {
 
@@ -22,6 +25,11 @@ bool writeStdout(const std::string& s) {
 }  // namespace
 
 int main(int argc, char** argv) {
+#ifdef __APPLE__
+  // A silent probe, never a permission request or an event tap.
+  if (argc > 1 && std::strcmp(argv[1], "--check-access") == 0)
+    return AXIsProcessTrusted() && CGPreflightPostEventAccess() ? 0 : 3;
+#endif
   std::signal(SIGPIPE, SIG_IGN);  // a closed pipe makes write() fail instead of killing the process
   lp::Output out(writeStdout);
   const bool simulate = argc > 1 && std::strcmp(argv[1], "--simulate") == 0;

@@ -1,6 +1,6 @@
 # WheelDesk
 
-[简体中文](README.zh-CN.md) · Internal beta 0.1.4
+[简体中文](README.zh-CN.md) · Internal beta 0.1.6
 
 A desktop action wheel for everyday tools, AI instructions, and local workflows. Hold Alt (Option on macOS), drag, and release on an action. Move back into the center, press Escape, or right-click to cancel.
 
@@ -23,9 +23,9 @@ The settings UI is modified directly from lolPing: its Fluent controls, platform
 
 The current delivery targets macOS 13+ on Apple Silicon. Windows 11 x64 source and native build workflow are included; a Windows installer is deferred.
 
-Open the DMG and drag WheelDesk to Applications. This internal build is ad-hoc signed, not notarized. If macOS blocks it, use System Settings → Privacy & Security → Open Anyway for this application.
+Open the DMG and drag WheelDesk to Applications. This internal build uses a persistent signing certificate and is not notarized. If macOS blocks it, use System Settings → Privacy & Security → Open Anyway for this application.
 
-1. Open WheelDesk. In Settings, open Accessibility settings and allow WheelDesk, then use **Retry input helper**. Rebuilding an ad-hoc-signed app may require removing its old Accessibility entry and granting access again.
+1. Open WheelDesk. In Settings, open Accessibility settings and allow WheelDesk, the helper reconnects automatically. Migrating from 0.1.4 or earlier requires removing the old entry and adding /Applications/WheelDesk.app once. Later updates retain the same signing identity.
 2. Grant Screen Recording when using screenshots. Screen capture stays off until you choose a screenshot action.
 3. In Models, add a service, choose a provider, enter its key, then choose or type a model. Fetch models offers a searchable list. **Save and test connection** sends a short text request and securely saves a typed key only after success; failed tests preserve the previous key. API format/address are configured automatically and hidden under **Advanced settings** by default. Custom services expose the URL directly; local services usually need no key. Tests may incur a small API charge and do not verify image support.
 4. In Wheels, choose the spoke count, then drag original effects between positions, then choose each slot’s function in **Bind custom functions**. Swapping effects moves their functions with them; replacing an effect keeps the slot’s function. Click a palette tile to preview it without running its function. Empty function slots do nothing. Size, duration, volume and mute are configurable. Changes save automatically; use the tray to switch wheels.
@@ -64,3 +64,5 @@ GitHub Actions checks both native platforms on push. **Build internal installers
 Settings are stored separately in `~/Library/Application Support/WheelDesk` or `%APPDATA%\WheelDesk`. API keys are encrypted with Electron safeStorage in `secrets.enc`, never included in ordinary settings. Results are kept in memory for the current run; screenshots and script files are removed after use. Only configured model endpoints receive AI requests. There is no backend account, telemetry, automatic update checker, room service, or cloud sync.
 
 The repository retains upstream source modules and regression tests to preserve compatibility of reused helpers/settings. Its only production main entry is `src/main/wheeldesk.ts`; rooms, agents and emote UI are not started. The original ping wheel and effects are part of WheelDesk. See [NOTICE](NOTICE.md) and [design](docs/wheeldesk.md).
+
+macOS packaging requires the original private signing identity. Hosted Actions deliberately fails macOS packaging until that identity is securely provisioned; never bypass this with ad-hoc signing. See [signing setup and backup](docs/wheeldesk.md#stable-macos-update-identity).
