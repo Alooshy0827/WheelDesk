@@ -70,13 +70,14 @@ describe('original effects with custom functions', () => {
     expect(chosen).toHaveBeenCalledExactlyOnceWith('copy', { x: 500, y: 500 });
     expect(effects()[0]?.effect).toBe(wheel.effects[count - 1]);
   });
-  it('opens newly added spokes empty until a function is explicitly assigned', async () => {
+  it('plays effects on newly added spokes without executing a function', async () => {
     state.settings.workbench.wheels[0] = resizeWheel(state.settings.workbench.wheels[0], 12);
     await gesture();
-    expect(events().find(e => e.type === 'open')?.enabled?.slice(8)).toEqual([false, false, false, false]);
-    release(300, 500); // W is spoke 9 on a 12-spoke wheel, one of the new empty slots.
+    expect(events().find(e => e.type === 'open')?.enabled?.slice(8)).toEqual([true, true, true, true]);
+    release(300, 500); // W is index 9 on a 12-spoke wheel, one of the new empty slots.
     expect(chosen).not.toHaveBeenCalled();
-    expect(effects()).toHaveLength(0);
+    expect(effects()).toHaveLength(1);
+    expect(effects()[0]?.effect).toBe(state.settings.workbench.wheels[0].effects[9]);
   });
   it('plays the selected effect and executes its independently bound action exactly once', async () => {
     state.settings.workbench.wheels[0].effects[0] = 'allin';
@@ -97,14 +98,27 @@ describe('original effects with custom functions', () => {
     expect(chosen).toHaveBeenCalledExactlyOnceWith('copy', { x: 500, y: 500 });
     expect(effects()[0]).toMatchObject({ effect: 'danger', name: 'Copy', visual: { wheelSizePx: DEFAULT_SETTINGS.wheelSizePx } });
   });
-  it('does not run a function or spawn an effect for an empty slot or cancellation', async () => {
+  it('plays an unbound slot once, but not for cancellation or the center', async () => {
     state.settings.workbench.wheels[0].slots[0] = null;
     await gesture();
-    expect(events().find(e => e.type === 'open')?.enabled?.[0]).toBe(false);
-    release();
+    expect(events().find(e => e.type === 'open')?.enabled?.[0]).toBe(true);
+    release(); release();
+    expect(effects()).toEqual([expect.objectContaining({ effect: 'danger', name: 'Danger' })]);
     await gesture(); surfaces.handle({ type: 'cancel' }); release();
     await gesture(); release(500, 500);
-    expect(chosen).not.toHaveBeenCalled(); expect(effects()).toEqual([]);
+    expect(chosen).not.toHaveBeenCalled(); expect(effects()).toHaveLength(1);
+  });
+  it('keeps an unbound slot and localized effect name from the gesture snapshot', async () => {
+    state.lang = 'zh-CN';
+    state.settings.workbench.wheels[0].slots[0] = null;
+    state.settings.workbench.wheels[0].effects[0] = 'allin';
+    await gesture();
+    expect(events().find(e => e.type === 'open')?.labels?.[0]).toBe('全力进攻');
+    state.settings.workbench.wheels[0].slots[0] = 'copy';
+    state.settings.workbench.wheels[0].effects[0] = 'danger';
+    release();
+    expect(chosen).not.toHaveBeenCalled();
+    expect(effects()).toEqual([expect.objectContaining({ effect: 'allin', name: '全力进攻' })]);
   });
   it('matches the original wheel dead zone at the configured scale', async () => {
     state.settings.wheelSizePx = 900;

@@ -5,6 +5,7 @@ import { pickSlice, WHEEL } from '../../shared/geometry';
 import { isPingId, type PingId } from '../../shared/pings';
 import { physicalToDip, type DisplayMap } from '../coords';
 import type { HelperEvent } from '../../shared/protocol';
+import { strings } from '../../shared/i18n';
 
 export type SurfaceRole = 'settings' | 'result' | 'overlay';
 export function loadDesk(win: BrowserWindow, role: SurfaceRole): Promise<void> {
@@ -98,7 +99,8 @@ export class DesktopSurfaces {
       const slots = wheel.slots.slice(0, wheel.slotCount);
       const effects = wheel.effects.slice(0, wheel.slotCount);
       const items = slots.map(id => wb.actions.find(a => a.id === id));
-      const labels = items.map(a => a ? lang === 'en' ? a.nameEn || a.name : a.name : '');
+      const effectNames = strings(lang, this.mac ? 'mac' : 'win').pingNames;
+      const labels = items.map((a, i) => a ? lang === 'en' ? a.nameEn || a.name : a.name : effectNames[effects[i]]);
       const visual = this.visual();
       this.gesture = { serial, displayId: p.display.id, origin: { x: p.x, y: p.y }, slots,
         labels, effects, visual };
@@ -107,7 +109,7 @@ export class DesktopSurfaces {
         if (this.gesture?.serial !== serial) return;
         this.send(p.display.id, { type: 'open', x: p.x - p.display.dip.x, y: p.y - p.display.dip.y,
           name: lang === 'en' ? wheel.nameEn || wheel.name : wheel.name, lang,
-          labels, effects, enabled: items.map(a => !!a), visual });
+          labels, effects, enabled: effects.map(() => true), visual });
         this.overlays.get(p.display.id)?.showInactive();
       });
       return;
@@ -122,11 +124,11 @@ export class DesktopSurfaces {
       const index = pickSlice(p.x - g.origin.x, p.y - g.origin.y, WHEEL.innerR * g.visual.wheelSizePx / WHEEL.size, g.slots.length);
       const actionId = index >= 0 ? g.slots[index] : null;
       this.cancel();
-      if (actionId) {
+      if (index >= 0) {
         this.send(g.displayId, { type: 'effect', effect: g.effects[index], name: g.labels[index],
           x: g.origin.x - map.dip.x, y: g.origin.y - map.dip.y, visual: g.visual });
         this.overlays.get(g.displayId)?.showInactive();
-        this.chosen(actionId, { x: map.phys.x + (g.origin.x - map.dip.x) * map.scale,
+        if (actionId) this.chosen(actionId, { x: map.phys.x + (g.origin.x - map.dip.x) * map.scale,
           y: map.phys.y + (g.origin.y - map.dip.y) * map.scale });
       }
     }

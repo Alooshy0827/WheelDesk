@@ -4,7 +4,7 @@ The fork keeps lolPing's native input state machine, physical/DIP coordinate con
 
 ## Production path
 
-`src/main/wheeldesk.ts` owns SettingsStore, InputBridge, ContextClient, SecretStore, DesktopSurfaces and ActionRunner. The gesture channel is the existing primary wheel; emote, ask, room and text triggers are disabled. Each gesture snapshots wheel slot IDs, original effect IDs, labels and visual/audio settings in the main process. A release is resolved with the shared, equally spaced 2–12-spoke geometry and scaled center radius, spawns the snapshotted effect and dispatches the custom action once. Empty slots and cancellations do neither. Renderers cannot supply executable command source at run time.
+`src/main/wheeldesk.ts` owns SettingsStore, InputBridge, ContextClient, SecretStore, DesktopSurfaces and ActionRunner. The gesture channel is the existing primary wheel; emote, ask, room and text triggers are disabled. Each gesture snapshots wheel slot IDs, original effect IDs, labels and visual/audio settings in the main process. A release is resolved with the shared, equally spaced 2–12-spoke geometry and scaled center radius, spawns the snapshotted effect and dispatches the custom action once. Unbound slots still play their selected effect and sound, without dispatching an action. Cancellations and center releases do neither. Renderers cannot supply executable command source at run time.
 
 `src/shared/actions.ts` defines independently identified actions, wheel profiles, workflow steps, input types and run state. `Settings.workbench` is normalized on every load and save. New settings do not migrate or overwrite an existing lolPing installation.
 
@@ -26,7 +26,7 @@ The settings editor and overlay use the same angular division as main-process se
 
 ## Original effects
 
-`src/renderer/workbench/Overlay.tsx` directly uses the upstream `Wheel` with configurable sector geometry, plus the unchanged `spawnPing` and `SoundBank`. `wheel-effects.css` is the upstream wheel/ping CSS extracted into a shared stylesheet. Both the editor preview and real selection use these same effects, including All In’s two animated image halves. The wheel’s hover labels show the bound function’s name. Main execution is independent of rendering and does not wait for the effect to finish.
+`src/renderer/workbench/Overlay.tsx` directly uses the upstream `Wheel` with configurable sector geometry, plus the unchanged `spawnPing` and `SoundBank`. `wheel-effects.css` is the upstream wheel/ping CSS extracted into a shared stylesheet. Both the editor preview and real selection use these same effects, including All In’s two animated image halves. The wheel’s hover labels show the bound function’s name, or the localized effect name when no function is bound. Unbound slots retain full hover highlighting. Main execution is independent of rendering and does not wait for the effect to finish.
 
 Renderer idle reports hide the transparent window after the original fade/effects finish. Explicit capture or display changes immediately clear effects; capture closes/reset all overlays so animations cannot contaminate a screenshot or leave a stale picker. Effect preview is settings-only IPC and never invokes the action runner.
 

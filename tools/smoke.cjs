@@ -1,5 +1,5 @@
 // Runs the real application against an isolated data directory and a local model fixture.
-const { app, BrowserWindow, nativeTheme } = require('electron');
+const { app, BrowserWindow, nativeTheme, screen } = require('electron');
 nativeTheme.themeSource = 'light';
 const { join } = require('node:path');
 const { mkdirSync, writeFileSync, readdirSync } = require('node:fs');
@@ -17,6 +17,18 @@ app.on('web-contents-created', (_e, web) => {
   web.on('console-message', event => { if (event.level === 'error') errors.push(event.message); });
   web.on('render-process-gone', (_e, details) => errors.push('renderer: ' + details.reason));
 });
+// Optional native simulator feeds the production bridge without generating OS input.
+let simulatedHook;
+if (process.env.WHEELDESK_SMOKE_GESTURES === '1') {
+  const processes = require('node:child_process');
+  const spawn = processes.spawn;
+  processes.spawn = (command, args, options) => {
+    if (command === join(root, 'native/hook-helper/build', process.platform === 'win32' ? 'hook-helper.exe' : 'hook-helper')) {
+      simulatedHook = spawn(command, ['--simulate'], options); return simulatedHook;
+    }
+    return spawn(command, args, options);
+  };
+}
 require('../out/main/index.js');
 const pause = ms => new Promise(r => setTimeout(r, ms));
 async function until(fn, label, timeout = 15000) {
@@ -145,7 +157,7 @@ app.whenReady().then(async () => {
   sendOverlay({type:'close',clear:true});
   for (const [count, savedWheel] of countWheels) {
     const activeSlots = savedWheel.slots.slice(0, count);
-    sendOverlay({type:'open',x:360,y:330,effects:savedWheel.effects.slice(0,count),enabled:activeSlots.map(Boolean),
+    sendOverlay({type:'open',x:360,y:330,effects:savedWheel.effects.slice(0,count),enabled:activeSlots.map(() => true),
       labels:activeSlots.map(id => settings.workbench.actions.find(a => a.id === id)?.name ?? ''),name:`${count} 辐轮盘`,visual});
     await until(() => overlayJS(`document.querySelectorAll('#wheel .icon').length === ${count} && document.querySelectorAll('#wheel .wedge').length === ${count}`), `${count}-spoke overlay`);
     const rad = (count - 1) * 2 * Math.PI / count;
@@ -165,6 +177,36 @@ app.whenReady().then(async () => {
   writeFileSync(join(smokeDir,'original-effects.png'), (await overlay.webContents.capturePage({x:0,y:0,width:820,height:660})).toPNG());
   sendOverlay({type:'close',clear:true});
   await until(() => !overlay.isVisible(), 'empty overlay hides after animation');
+
+  if (process.env.WHEELDESK_SMOKE_GESTURES === '1') {
+    await until(() => simulatedHook, 'native gesture simulator');
+    const emptySettings = structuredClone(settings);
+    emptySettings.workbench.wheels[0].slots[0] = null;
+    emptySettings.workbench.wheels[0].effects[0] = 'allin';
+    assert.equal((await invoke({type:'save', settings:emptySettings})).ok, true);
+    const beforeEmpty = (await invoke({type:'state'})).state.run;
+    const bounds = screen.getPrimaryDisplay().bounds;
+    let simTime = 1000;
+    const sim = (ev, x = 360, y = 330, extra = {}) => {
+      const point = {x: bounds.x + x, y: bounds.y + y};
+      const physical = process.platform === 'darwin' ? point : screen.dipToScreenPoint(point);
+      simulatedHook.stdin.write(JSON.stringify({type:'sim',ev,...physical,t:simTime += 20,...extra}) + '\n');
+    };
+    sim('kdown',360,330,{vk:164}); sim('mdown',360,330,{btn:'left'}); sim('move',360,190);
+    await until(() => overlayJS('document.querySelector("#wheel").classList.contains("open")'), 'unbound wheel via production bridge');
+    sim('move',360,180);
+    await until(() => overlayJS('document.querySelector("#wheel .centerTxt").textContent === "全力进攻"'), 'unbound slot uses effect name');
+    assert.equal(await overlayJS('document.querySelectorAll("#wheel .icon.dim").length'), 0);
+    sim('mup',360,180,{btn:'left'}); sim('kup',360,180,{vk:164});
+    await until(() => overlayJS('document.querySelectorAll(".clash img").length === 2'), 'unbound slot plays original All In effect');
+    sim('mup',360,180,{btn:'left'});
+    await pause(80);
+    assert.equal(await overlayJS('document.querySelectorAll(".ping").length'), 1);
+    assert.deepEqual((await invoke({type:'state'})).state.run, beforeEmpty);
+    assert(!BrowserWindow.getAllWindows().some(w => w.webContents.getURL().includes('#result')));
+    sendOverlay({type:'close',clear:true});
+    assert.equal((await invoke({type:'save',settings})).ok,true);
+  }
 
   const requests = [];
   let probeStatus = 200;
@@ -288,7 +330,7 @@ app.whenReady().then(async () => {
   await resultWin.webContents.executeJavaScript('window.desk.invoke({type:"cancel"})');
   await until(async () => (await invoke({type:'state'})).state.run.status === 'cancelled' && !resultWin.isVisible(), 'cancel without another popup');
   assert.deepEqual(errors, []);
-  writeFileSync(join(smokeDir, 'report.json'), JSON.stringify({ passed: true, helper: finished.helper,
+  writeFileSync(join(smokeDir, 'report.json'), JSON.stringify({ passed: true, simulatedGestures: Boolean(simulatedHook), helper: finished.helper,
     checks: ['eight provider presets and persistence', 'real model test and localized auth error', 'save-and-test persists successful keys with mock keychain', 'failed replacement preserves saved key', 'advanced settings collapsed by default', 'model-test sender validation', '2–12 spokes through real settings UI', 'per-wheel spoke count persistence after reload', 'hidden function restoration', 'dynamic overlay hit alignment', 'settings mounts', 'upstream six-section navigation', 'original effect/function pairs move and autosave', 'empty function slots', '12 original effects', 'original collision/ring/bobbing animations', '12 sounds fetched and decoded', 'preview does not execute actions', 'original wheel geometry/hover/transition', 'custom function labels', 'idle overlay cleanup', 'light and dark themes', 'Chinese language', 'independent branding', 'model listing', 'text-only AI request', 'no AI tools', 'streamed result', 'usage', 'renderer IPC permissions', 'real script action', 'ordinary actions never show result window', 'failure and manual input still show', 'cancellation stays hidden'], rendererErrors: errors }, null, 2));
   console.log('WheelDesk smoke passed', JSON.stringify({ helper: finished.helper }));
   server.close(); app.quit();

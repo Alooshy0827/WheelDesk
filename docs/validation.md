@@ -1,12 +1,12 @@
 # Validation / 验证记录
 
-Version: 0.1.7 internal beta. Host: Apple Silicon, macOS 26.6. Target: macOS 13+ Apple Silicon. Windows installer is deferred by request.
+Version: 0.1.8 internal beta. Host: Apple Silicon, macOS 26.6. Target: macOS 13+ Apple Silicon. Windows installer is deferred by request.
 
 ## Automated checks
 
 - `npm run typecheck`: passed.
 - `npm run test:helper`: 692 input assertions, 544 context assertions, 26 macOS callback assertions; all passed (1,262 total). The context tests include shortcut validation, held modifiers, target changes and elevated targets.
-- `npm test`: 137 files passed; 2,157 tests passed, 5 skipped. Includes automatic permission recovery after a grant, suppressing retry loops, failed probes and shutdown during a probe; provider preset persistence, credential clearing on endpoint changes, fixed text-only probes for both protocols, invalid configuration, authentication/rate/model/network/timeout/empty-response errors, plus every spoke count from 2 through 12, odd/even angular boundaries, rendered hit alignment at three scales, per-gesture count snapshots, hidden binding persistence/restoration, original-effect migration, moving effect/function pairs, preserving every binding when resetting replaced effects, gesture snapshots, one-shot dispatch, preview isolation, scaled hit testing, capture cleanup, local asset-origin boundaries, upstream regressions, configuration repair, workflow sequencing/failure/cancel/snapshots, actual scripts, provider fixtures and credential boundaries.
+- `npm test`: 137 files passed; 2,158 tests passed, 5 skipped. Includes automatic permission recovery after a grant, suppressing retry loops, failed probes and shutdown during a probe; provider preset persistence, credential clearing on endpoint changes, fixed text-only probes for both protocols, invalid configuration, authentication/rate/model/network/timeout/empty-response errors, plus every spoke count from 2 through 12, odd/even angular boundaries, rendered hit alignment at three scales, per-gesture count snapshots, hidden binding persistence/restoration, original-effect migration, moving effect/function pairs, preserving every binding when resetting replaced effects, gesture snapshots, one-shot dispatch, preview isolation, scaled hit testing, capture cleanup, local asset-origin boundaries, upstream regressions, configuration repair, workflow sequencing/failure/cancel/snapshots, actual scripts, provider fixtures and credential boundaries.
 - `npm run build`: passed.
 
 - Prior GitHub Actions: [initial cross-platform check](https://github.com/Alooshy0827/WheelDesk/actions/runs/43441701375) passed on both native platforms.
@@ -53,3 +53,11 @@ This is an internal beta, not a claim that every item in the original two-platfo
 - Built and verified the DMG using the existing pinned certificate, backed up 0.1.6, and installed 0.1.7 in `/Applications/WheelDesk.app`. Temporary bundles were removed and Launch Services retained only the canonical application.
 
 - Installed 0.1.7 UI confirmed through the native accessibility tree: correct version and “轮盘已开启”; no Accessibility grant was changed for this update. The initial UI inspection timed out during startup, then succeeded once the input helper was running.
+
+
+## Unbound slot effects (0.1.8)
+
+- Main-process regression tests verify that unbound and newly added spokes play their configured effect once without dispatching an action. Center releases and cancellation add no effect. Empty bindings, localized effect labels and visual choices remain snapshotted even if settings change during the gesture.
+- The real Electron smoke suite passed with an isolated configuration and `WHEELDESK_SMOKE_GESTURES=1`. This test-only mode runs the existing native helper with `--simulate`, feeding its protocol into the production InputBridge and DesktopSurfaces without injecting input into the OS. Selecting an unbound All In slot displayed its Chinese effect name, full hover highlighting and the two original collision images; a duplicate release added no second effect, RunState stayed unchanged, and no result window was created. All existing model/UI/effect checks passed as well. This is application integration validation, not a claim of physical mouse acceptance.
+
+- Generated and checksum-verified the 0.1.8 DMG with the existing pinned signer; backed up and replaced the installed 0.1.7 bundle. The install check found only `/Applications/WheelDesk.app` registered, and removed the temporary application bundle.
