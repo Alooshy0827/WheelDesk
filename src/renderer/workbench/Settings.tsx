@@ -208,9 +208,8 @@ export function SettingsApp() {
       <nav className="side" ref={nav}><span className="navBar" ref={bar}/>
         <div className="brand">
           <div className="wdPortraitRing"><img src={logo} alt=""/></div>
-          <div><b>WHEELDESK</b><span className="desc">{t.subtitle}</span></div>
+          <div><b>WHEELDESK</b></div>
         </div>
-        <div className="wdNavGroupLabel">{state.lang === 'zh-CN' ? '游戏选项 · 分类' : 'CATEGORIES'}</div>
         {sectionIds.map((id, i) => <button key={id} data-section={id} className={`navItem${active === id ? ' sel' : ''}`} onClick={() => show(id)}><span className="wdNavDiamond" aria-hidden="true"/>{navIcons[i]}<span>{sectionNames[id]}</span></button>)}
         <div aria-hidden="true" className="wdCompassSeal"><i/></div>
         <div className="wdSidebarFoot">
@@ -223,7 +222,6 @@ export function SettingsApp() {
       <main className="content" inert={aiPending} aria-busy={aiPending} ref={main} onScroll={onScroll} onScrollEnd={() => { jumping.current = false; }}>
         <div className="wdPageBanner">
           <h1 className="pageTitle">{sectionNames[active]}</h1>
-          <span className="wdPageSub">{t.subtitle}</span>
         </div>
         {state.platform === 'mac' && state.helper === 'noAccess' && <div className="card permission"><span className="icon"><ShieldKeyhole24Regular/></span><div className="lbl"><b>{t.helperStates.noAccess}</b><p className="desc">{t.permissionsHint}</p><div className="wdButtons"><Button className="wdBtnPrimary" appearance="primary" onClick={() => void invoke({ type: 'accessibility' })}>{t.accessibility}</Button><Button onClick={() => void invoke({ type: 'retry' })}>{t.retry}</Button></div></div></div>}
         <div className="card status"><div className={`dot${state.helper === 'failed' || state.helper === 'noAccess' ? ' failed' : off ? ' off' : ''}`}/><div className="wdStatusRing"><img className="statusPing" src={logo} alt=""/></div><div className="lbl"><b>{statusTitle}</b><span className="desc">{t.wheelHelp}</span></div><OnOffSwitch checked={draft.enabledOnStart} onChange={enabledOnStart => changeSettings({ enabledOnStart })}/></div>

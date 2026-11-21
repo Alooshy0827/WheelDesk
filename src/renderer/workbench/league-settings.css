@@ -289,21 +289,6 @@ body.settings {
   letter-spacing: 0.1em;
   color: var(--lol-gold-1);
 }
-.wdSettings .brand .desc {
-  color: var(--lol-grey-1);
-  font-size: 11px;
-  margin-top: 2px;
-}
-
-.wdNavGroupLabel {
-  padding: 4px 16px 8px;
-  font-family: var(--lol-display);
-  font-size: 10.5px;
-  font-weight: 700;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--lol-gold-4);
-}
 
 :root[data-platform] .wdSettings .navBar,
 .wdSettings .navBar {
@@ -505,10 +490,6 @@ body.settings {
   letter-spacing: 0.08em;
   color: var(--lol-gold-1);
   text-shadow: 0 1px 4px rgba(0, 0, 0, 0.8);
-}
-.wdPageSub {
-  font-size: 12px;
-  color: var(--lol-grey-1);
 }
 
 /* Section Headers (◆ 触发方式 ──────────) */
