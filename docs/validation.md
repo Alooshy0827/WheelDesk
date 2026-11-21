@@ -1,6 +1,6 @@
 # Validation / 验证记录
 
-Version: 0.1.12 internal beta. Host: Apple Silicon, macOS 26.6. Target: macOS 13+ Apple Silicon. Windows installer is deferred by request.
+Version: 0.1.13 internal beta. Host: Apple Silicon, macOS 26.6. Target: macOS 13+ Apple Silicon. Windows installer is deferred by request.
 
 ## Automated checks
 
@@ -90,3 +90,7 @@ The 1024 px application icon and the 128 px settings asset use the revised first
 ## Keychain access on startup (0.1.12)
 
 Validated with existing credential-file fixtures. Settings, overlay startup and state queries made zero calls to the Electron safeStorage API in an instrumented Electron process. The renderer session is in-memory. A denied decrypt preserved the original bytes, and a later explicit read recovered the original key. Typecheck, production build, 1,282 native assertions and 2,176 JavaScript tests passed (five skipped). These checks do not change or test the user's login keychain ACL.
+
+## macOS menu bar artwork (0.1.13)
+
+The new compass template has 22 × 22 and 44 × 44 transparent PNG representations. Electron loaded both scales at a logical size of 22 points and reported template rendering enabled. Checked contrast on light and dark backgrounds. Typecheck, production build, the native helper suite and the JavaScript suite passed (2,176 tests passed, five skipped).

@@ -436,8 +436,9 @@ void app.whenReady().then(async () => {
     else surfaces.handle(event);
   });
   bridge.on('status', () => { if (bridge.status !== 'running') surfaces.cancel(); broadcast(); });
-  const icon = nativeImage.createFromPath(app.isPackaged ? join(process.resourcesPath, 'trayTemplate.png')
-    : join(app.getAppPath(), 'build/desk/trayTemplate.png'));
+  const trayAsset = mac ? 'trayCompassTemplate.png' : 'trayTemplate.png';
+  const icon = nativeImage.createFromPath(app.isPackaged ? join(process.resourcesPath, trayAsset)
+    : join(app.getAppPath(), 'build/desk', trayAsset));
   icon.setTemplateImage(mac);
   tray = new Tray(icon); tray.setToolTip('WheelDesk'); tray.on('double-click', () => void showSettings());
   ipcMain.handle(DESK_CH.invoke, async (event, raw: unknown) => {
