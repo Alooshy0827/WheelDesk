@@ -2,3 +2,191 @@ body.result{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;c
 
 .desk-effects{position:fixed;inset:0;pointer-events:none}.overlay #wheel{overflow:visible}
 @media(prefers-reduced-motion:reduce){.overlay #wheel,.overlay #wheel .icon{transition:none!important}}
+
+/* 1:1 League of Legends in-game Hextech modal & capture styling. */
+.capture-hint {
+  background: linear-gradient(180deg, #0b1c26, #040d14);
+  color: #f0e6d2;
+  border: 1.5px solid #c8aa6e;
+  border-radius: 1px;
+  font-family: 'Cinzel', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei UI', sans-serif;
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, .95);
+  box-shadow: inset 0 0 0 2px #010a13, 0 8px 28px rgba(0, 0, 0, .75);
+}
+.capture-rect {
+  border: 2px solid #0ac8b9;
+  background: rgba(10, 200, 185, .12);
+  box-shadow: 0 0 0 10000px rgba(1, 10, 19, .55), inset 0 0 14px rgba(10, 200, 185, .28);
+}
+
+body.result {
+  color-scheme: dark;
+  color: #f0e6d2;
+  background:
+    radial-gradient(ellipse 80% 45% at 20% 0%, rgba(10, 130, 145, .24), transparent 62%),
+    linear-gradient(180deg, #081520 0%, #030a11 100%);
+  --line: rgba(120, 90, 40, .55);
+  margin: 0;
+}
+body.result .result-card {
+  position: relative;
+  border: 2px solid #785a28;
+  box-shadow:
+    inset 0 0 0 1px #010a13,
+    inset 0 0 0 2px rgba(200, 170, 110, .34),
+    inset 0 1px 0 rgba(240, 230, 210, .2);
+  padding: 18px 20px;
+}
+body.result .result-card::before,
+body.result .result-card::after {
+  content: '';
+  position: absolute;
+  inset: 2px;
+  pointer-events: none;
+  background-repeat: no-repeat;
+  background-size: 20px 20px;
+}
+body.result .result-card::before {
+  background-image:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 28 28'%3E%3Cpath d='M1 27 V7 L7 1 H27' fill='none' stroke='%23c8aa6e' stroke-width='1.8'/%3E%3Cpolygon points='7,3 11,7 7,11 3,7' fill='%23c8aa6e'/%3E%3C/svg%3E"),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 28 28'%3E%3Cpath d='M27 27 V7 L21 1 H1' fill='none' stroke='%23c8aa6e' stroke-width='1.8'/%3E%3Cpolygon points='21,3 25,7 21,11 17,7' fill='%23c8aa6e'/%3E%3C/svg%3E");
+  background-position: left top, right top;
+}
+body.result .result-card::after {
+  background-image:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 28 28'%3E%3Cpath d='M1 1 V21 L7 27 H27' fill='none' stroke='%23c8aa6e' stroke-width='1.8'/%3E%3Cpolygon points='7,17 11,21 7,25 3,21' fill='%23c8aa6e'/%3E%3C/svg%3E"),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 28 28'%3E%3Cpath d='M27 1 V21 L21 27 H1' fill='none' stroke='%23c8aa6e' stroke-width='1.8'/%3E%3Cpolygon points='21,17 25,21 21,25 17,21' fill='%23c8aa6e'/%3E%3C/svg%3E");
+  background-position: left bottom, right bottom;
+}
+body.result .result-header {
+  padding-bottom: 14px;
+  border-bottom: 1px solid #463714;
+  box-shadow: 0 1px 0 rgba(200, 170, 110, .18);
+}
+body.result .brand-mark {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: radial-gradient(circle, #14444f 0%, #05131c 82%);
+  color: #f0e6d2;
+  border: 1.5px solid #c8aa6e;
+  box-shadow: 0 0 0 2px #010a13, 0 0 10px rgba(10, 200, 185, .3);
+}
+body.result .result-header b {
+  font-family: 'Cinzel', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei UI', sans-serif;
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: .06em;
+  color: #f0e6d2;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, .95);
+}
+body.result .result-header .icon-button {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  line-height: 24px;
+  text-align: center;
+  font-size: 18px;
+  border-radius: 50%;
+  background: linear-gradient(180deg, #1d2329, #0e1318);
+  border: 1px solid #785a28;
+  color: #cdbe91;
+}
+body.result .result-header .icon-button:hover {
+  border-color: #f0e6d2;
+  color: #f0e6d2;
+}
+body.result .result-status,
+body.result small,
+body.result p {
+  color: #a09b8c;
+}
+body.result .status-dot,
+body.result .pulse {
+  width: 7px;
+  height: 7px;
+  border-radius: 0;
+  transform: rotate(45deg);
+  background: #0ac8b9;
+  box-shadow: 0 0 8px #0ac8b9;
+}
+body.result .thinking i {
+  width: 6px;
+  height: 6px;
+  border-radius: 0;
+  transform: rotate(45deg);
+  background: #c8aa6e;
+}
+body.result .result-content {
+  padding: 2px 4px 2px 0;
+}
+body.result .result-content::-webkit-scrollbar { width: 6px; }
+body.result .result-content::-webkit-scrollbar-track { background: #02080e; }
+body.result .result-content::-webkit-scrollbar-thumb { background: linear-gradient(180deg, #c8aa6e, #785a28); }
+body.result .answer {
+  color: #f0e6d2;
+  line-height: 1.75;
+}
+body.result .result-status span:last-child,
+body.result .result-footer small {
+  font-family: 'Barlow Condensed', 'DIN Alternate', 'Bahnschrift', sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: .06em;
+}
+body.result button,
+body.result textarea {
+  color: #cdbe91;
+  background: linear-gradient(180deg, #1d2329 0%, #11161b 100%);
+  border: 1px solid #785a28;
+  border-radius: 1px;
+  font-weight: 700;
+  letter-spacing: .05em;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, .9);
+}
+body.result textarea {
+  color: #f0e6d2;
+  background: #040b11;
+  font-weight: 400;
+  letter-spacing: 0;
+  box-shadow: inset 0 1px 4px rgba(0, 0, 0, .8);
+}
+body.result button:not(:disabled):hover {
+  color: #f0e6d2;
+  background: linear-gradient(180deg, #2d291e, #16181c);
+  border-color: #c8aa6e;
+  box-shadow: 0 0 10px rgba(200, 170, 110, .22);
+}
+body.result button.primary {
+  color: #f0e6d2;
+  background: linear-gradient(180deg, #12404b 0%, #08242d 100%);
+  border: 1.5px solid #c8aa6e;
+  box-shadow: inset 0 1px 0 rgba(240, 230, 210, .25), 0 0 10px rgba(10, 200, 185, .18);
+}
+body.result button.primary:not(:disabled):hover {
+  color: #fffaf0;
+  background: linear-gradient(180deg, #175765 0%, #0c3540 100%);
+  border-color: #f0e6d2;
+  box-shadow: 0 0 14px rgba(10, 200, 185, .36);
+}
+body.result :focus-visible { outline: 2px solid #f0e6d2; outline-offset: 2px; }
+body.result .message {
+  background: rgba(10, 50, 60, .65);
+  border: 1px solid #0ac8b9;
+  border-radius: 1px;
+  color: #f0e6d2;
+}
+body.result .error,
+body.result .error-box {
+  background: rgba(58, 17, 24, .88);
+  border: 1px solid #e84057;
+  border-radius: 1px;
+  color: #ffd5da;
+}
+body.result .result-footer {
+  border-top: 1px solid #463714;
+  padding-top: 14px;
+  margin-top: 16px;
+}

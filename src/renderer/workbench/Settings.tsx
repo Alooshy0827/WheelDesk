@@ -1,4 +1,4 @@
-import { Button, Combobox, Dropdown, FluentProvider, Input, Option, Textarea, webDarkTheme, webLightTheme, motionTokens } from '@fluentui/react-components';
+import { Button, Combobox, Dropdown, FluentProvider, Input, Option, Textarea, motionTokens } from '@fluentui/react-components';
 import { Add24Regular, Apps24Regular, ArrowSync24Regular, Copy24Regular, Cursor24Regular, DataPie24Regular, Delete24Regular, Info24Regular, LocalLanguage24Regular, Play24Regular, Power24Regular, Rocket24Regular, Settings24Regular, ShieldKeyhole24Regular, Sparkle24Regular, ResizeLarge24Regular, Timer24Regular, Speaker224Regular, SpeakerMute24Regular, MusicNote224Regular } from '@fluentui/react-icons';
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import type { DeskCommand, DeskReply, DeskState } from '../../shared/ipc';
@@ -11,12 +11,13 @@ import { ExpanderRow, OnOffSwitch, SettingRow, SliderRow, SwitchRow } from '../s
 import { WheelEditor } from '../settings/components/WheelEditor';
 import { DraftInput } from '../settings/components/mateFields';
 import { TextContext } from '../settings/text';
-import { macDarkTheme, macLightTheme } from '../settings/macTheme';
+import { leagueTheme } from './leagueTheme';
 import { barFrames } from '../settings/navIndicator';
 import { ALL_PINGS, DEFAULT_WHEEL, FALLBACK_TEXTURE, textureUrl } from '../../shared/pings';
 import '../settings/settings.css';
 import '../settings/mac.css';
 import './settings-additions.css';
+import './league-settings.css';
 
 const uid = () => crypto.randomUUID();
 const logo = '../wheeldesk-icon.png';
@@ -40,7 +41,6 @@ export function SettingsApp() {
   const queue = useRef<Promise<boolean>>(Promise.resolve(true));
   const [message, setMessage] = useState('');
   const [failed, setFailed] = useState(false);
-  const [dark, setDark] = useState(matchMedia('(prefers-color-scheme: dark)').matches);
   const [active, setActive] = useState<Section>('trigger');
   const main = useRef<HTMLElement>(null), nav = useRef<HTMLElement>(null), bar = useRef<HTMLSpanElement>(null);
   const barTop = useRef<number | null>(null), jumping = useRef(false);
@@ -60,10 +60,7 @@ export function SettingsApp() {
       if (revision.current === savedRevision.current) { draftRef.current = structuredClone(s.settings); setDraft(draftRef.current); }
     };
     void window.desk.invoke({ type: 'state' }).then(r => { if (r.state) receive(r.state); });
-    const unsubscribe = window.desk.onState(receive);
-    const media = matchMedia('(prefers-color-scheme: dark)');
-    const change = () => setDark(media.matches); media.addEventListener('change', change);
-    return () => { unsubscribe(); media.removeEventListener('change', change); };
+    return window.desk.onState(receive);
   }, []);
   useLayoutEffect(() => {
     const item = nav.current?.querySelector<HTMLElement>(`[data-section="${active}"]`);
@@ -75,7 +72,6 @@ export function SettingsApp() {
   }, [active, state?.lang]);
   if (!state || !draft) return null;
   const t = deskText(state.lang), upstream = { ...strings(state.lang, state.platform), wheelPickHint: (name: string) => t.wheelPick.replace('{{name}}', name) }, wb = draft.workbench;
-  const theme = state.platform === 'mac' ? dark ? macDarkTheme : macLightTheme : dark ? webDarkTheme : webLightTheme;
   const name = (a: { name: string; nameEn?: string }) => state.lang === 'en' ? a.nameEn || a.name : a.name;
   const notice = (text: string, error = false) => { setMessage(text); setFailed(error); };
   const invoke = async (cmd: DeskCommand): Promise<DeskReply> => {
@@ -185,23 +181,58 @@ export function SettingsApp() {
   const sectionNames: Record<Section, string> = { trigger: upstream.navTrigger, wheels: t.wheels, actions: t.actions, workflows: t.workflows, models: t.models, general: t.general };
   const navIcons = [<Cursor24Regular/>, <DataPie24Regular/>, <Apps24Regular/>, <ArrowSync24Regular/>, <Sparkle24Regular/>, <Settings24Regular/>];
   const off = !draft.enabledOnStart;
-  return <FluentProvider theme={theme} style={{ background: 'transparent', height: '100%' }}><TextContext.Provider value={upstream}>
+  const statusKind = state.helper === 'failed' || state.helper === 'noAccess' ? 'failed' : off ? 'off' : 'on';
+  const statusTitle = state.helper === 'running' ? draft.enabledOnStart ? t.wheelEnabled : t.wheelDisabled : t.helperStates[state.helper];
+  const cornerOrnament = (pos: 'tl' | 'tr' | 'bl' | 'br') => (
+    <svg aria-hidden="true" className={`wdCorner ${pos}`} viewBox="0 0 28 28" width="28" height="28">
+      <path d="M1 27 V7 L7 1 H27" fill="none" stroke="#c8aa6e" strokeWidth="1.6"/>
+      <path d="M4.5 23 V9 L9 4.5 H23" fill="none" stroke="#785a28" strokeWidth="1"/>
+      <polygon points="7,3 11,7 7,11 3,7" fill="#c8aa6e" stroke="#010a13" strokeWidth="0.9"/>
+    </svg>
+  );
+  return <FluentProvider theme={leagueTheme} style={{ background: '#010a13', height: '100%' }}><TextContext.Provider value={upstream}>
     <div className="app wdSettings">
-      <div className="titlebar"><img src={logo} alt=""/>WheelDesk</div>
-      <nav className="side" ref={nav}><span className="navBar" ref={bar}/><div className="brand"><img src={logo} alt=""/><div><b>WheelDesk</b><span className="desc">{t.subtitle}</span></div></div>
-        {sectionIds.map((id, i) => <button key={id} data-section={id} className={`navItem${active === id ? ' sel' : ''}`} onClick={() => show(id)}>{navIcons[i]}{sectionNames[id]}</button>)}
-        <div className="wdSidebarFoot"><span className="desc">{t.about}</span><span role="status" className={failed ? 'wdError' : 'desc'}>{message}</span>{aiPending && <Button size="small" onClick={() => void invoke({ type: 'cancelPrepareAI' })}>{t.cancel}</Button>}{failed && <Button disabled={aiPending} size="small" onClick={() => void flush()}>{t.save}</Button>}</div>
+      {cornerOrnament('tl')}{cornerOrnament('tr')}{cornerOrnament('bl')}{cornerOrnament('br')}
+      <header className="titlebar">
+        <div className="wdTitleLeft"/>
+        <div className="wdTitleCenter">
+          <span className="wdFiligree left"/>
+          <span className="wdTitleCrest"><img src={logo} alt=""/></span>
+          <span className="wdTitleText">WHEELDESK · {state.lang === 'zh-CN' ? '选项' : 'OPTIONS'}</span>
+          <span className="wdFiligree right"/>
+        </div>
+        <div className="wdTitleRight">
+          <span className={`wdLivePill ${statusKind}`}><i className="wdGem"/>{statusTitle}</span>
+        </div>
+      </header>
+      <nav className="side" ref={nav}><span className="navBar" ref={bar}/>
+        <div className="brand">
+          <div className="wdPortraitRing"><img src={logo} alt=""/></div>
+          <div><b>WHEELDESK</b><span className="desc">{t.subtitle}</span></div>
+        </div>
+        <div className="wdNavGroupLabel">{state.lang === 'zh-CN' ? '游戏选项 · 分类' : 'CATEGORIES'}</div>
+        {sectionIds.map((id, i) => <button key={id} data-section={id} className={`navItem${active === id ? ' sel' : ''}`} onClick={() => show(id)}><span className="wdNavDiamond" aria-hidden="true"/>{navIcons[i]}<span>{sectionNames[id]}</span></button>)}
+        <div aria-hidden="true" className="wdCompassSeal"><i/></div>
+        <div className="wdSidebarFoot">
+          <span className="wdVersionBadge">{t.about}</span>
+          {message && <span role="status" className={failed ? 'wdError' : 'desc'}>{message}</span>}
+          {aiPending && <Button size="small" onClick={() => void invoke({ type: 'cancelPrepareAI' })}>{t.cancel}</Button>}
+          {failed && <Button disabled={aiPending} size="small" onClick={() => void flush()}>{t.save}</Button>}
+        </div>
       </nav>
       <main className="content" inert={aiPending} aria-busy={aiPending} ref={main} onScroll={onScroll} onScrollEnd={() => { jumping.current = false; }}>
-        <h1 className="pageTitle">{upstream.pageTitle}</h1>
-        {state.platform === 'mac' && state.helper === 'noAccess' && <div className="card permission"><span className="icon"><ShieldKeyhole24Regular/></span><div className="lbl"><b>{t.helperStates.noAccess}</b><p className="desc">{t.permissionsHint}</p><div className="wdButtons"><Button appearance="primary" onClick={() => void invoke({ type: 'accessibility' })}>{t.accessibility}</Button><Button onClick={() => void invoke({ type: 'retry' })}>{t.retry}</Button></div></div></div>}
-        <div className="card status"><div className={`dot${state.helper === 'failed' || state.helper === 'noAccess' ? ' failed' : off ? ' off' : ''}`}/><img className="statusPing" src={logo} alt=""/><div className="lbl"><b>{state.helper === 'running' ? draft.enabledOnStart ? t.wheelEnabled : t.wheelDisabled : t.helperStates[state.helper]}</b><span className="desc">{t.wheelHelp}</span></div><OnOffSwitch checked={draft.enabledOnStart} onChange={enabledOnStart => changeSettings({ enabledOnStart })}/></div>
+        <div className="wdPageBanner">
+          <h1 className="pageTitle">{sectionNames[active]}</h1>
+          <span className="wdPageSub">{t.subtitle}</span>
+        </div>
+        {state.platform === 'mac' && state.helper === 'noAccess' && <div className="card permission"><span className="icon"><ShieldKeyhole24Regular/></span><div className="lbl"><b>{t.helperStates.noAccess}</b><p className="desc">{t.permissionsHint}</p><div className="wdButtons"><Button className="wdBtnPrimary" appearance="primary" onClick={() => void invoke({ type: 'accessibility' })}>{t.accessibility}</Button><Button onClick={() => void invoke({ type: 'retry' })}>{t.retry}</Button></div></div></div>}
+        <div className="card status"><div className={`dot${state.helper === 'failed' || state.helper === 'noAccess' ? ' failed' : off ? ' off' : ''}`}/><div className="wdStatusRing"><img className="statusPing" src={logo} alt=""/></div><div className="lbl"><b>{statusTitle}</b><span className="desc">{t.wheelHelp}</span></div><OnOffSwitch checked={draft.enabledOnStart} onChange={enabledOnStart => changeSettings({ enabledOnStart })}/></div>
         <div className="section" id="trigger">{upstream.navTrigger}</div>
         <SettingRow icon={<Cursor24Regular/>} title={t.trigger} description={t.wheelHelp} dim={off}><Choice label={t.trigger} value={typeof draft.trigger === 'string' ? draft.trigger : 'custom'} options={[...keyboardTriggers(state.platform), 'mouse4', 'mouse5'].map(id => ({ id, name: triggerLabel(id as TriggerKey, state.lang, state.platform) }))} onChange={v => changeSettings({ trigger: v as TriggerKey })}/></SettingRow>
         <SwitchRow icon={<Power24Regular/>} title={t.enabled} checked={draft.enabledOnStart} onChange={v => changeSettings({ enabledOnStart: v })}/>
         <div className="section" id="wheels">{t.wheels}</div>
         <SettingRow icon={<DataPie24Regular/>} title={t.wheels} description={t.wheelSlotsHelp}><Choice label={t.wheels} value={wheel.id} options={wb.wheels.map(w => ({ id: w.id, name: name(w) }))} onChange={setWheelId}/><Button icon={<Add24Regular/>} aria-label={t.newWheel} onClick={() => { const id = uid(); edit({ wheels: [...wb.wheels, { id, name: t.newWheel, nameEn: t.newWheel, slotCount: 8, slots: Array(8).fill(null), effects: [...DEFAULT_WHEEL], slotNames: Array(8).fill('') }] }); setWheelId(id); }}/></SettingRow>
-        <ExpanderRow icon={<Settings24Regular/>} title={name(wheel)} control={<div className="wdButtons"><Button icon={<Copy24Regular/>} onClick={() => { const id = uid(); edit({ wheels: [...wb.wheels, { ...structuredClone(wheel), id, name: wheel.name + ' 2', nameEn: wheel.nameEn + ' 2' }] }); setWheelId(id); }}>{t.duplicate}</Button><Button icon={<Delete24Regular/>} disabled={wb.wheels.length <= 1} onClick={() => remove(() => { edit({ wheels: wb.wheels.filter(w => w.id !== wheel.id) }); setWheelId(''); })}>{t.remove}</Button><Button appearance="primary" disabled={wb.activeWheelId === wheel.id} onClick={() => edit({ activeWheelId: wheel.id })}>{wb.activeWheelId === wheel.id ? t.active : t.activate}</Button></div>}><div className="expPane"><div className="mateFields"><span>{t.name}</span><DraftInput key={wheel.id + 'name'} value={wheel.name} maxLength={80} onSave={v => edit({ wheels: wb.wheels.map(w => w.id === wheel.id ? { ...w, name: v } : w) })}/><span>{t.nameEn}</span><DraftInput key={wheel.id + 'en'} value={wheel.nameEn} maxLength={80} onSave={v => edit({ wheels: wb.wheels.map(w => w.id === wheel.id ? { ...w, nameEn: v } : w) })}/></div></div></ExpanderRow>
+        <ExpanderRow icon={<Settings24Regular/>} title={name(wheel)} control={<div className="wdButtons"><Button icon={<Copy24Regular/>} onClick={() => { const id = uid(); edit({ wheels: [...wb.wheels, { ...structuredClone(wheel), id, name: wheel.name + ' 2', nameEn: wheel.nameEn + ' 2' }] }); setWheelId(id); }}>{t.duplicate}</Button><Button icon={<Delete24Regular/>} disabled={wb.wheels.length <= 1} onClick={() => remove(() => { edit({ wheels: wb.wheels.filter(w => w.id !== wheel.id) }); setWheelId(''); })}>{t.remove}</Button><Button className="wdBtnPrimary" appearance="primary" disabled={wb.activeWheelId === wheel.id} onClick={() => edit({ activeWheelId: wheel.id })}>{wb.activeWheelId === wheel.id ? t.active : t.activate}</Button></div>}><div className="expPane"><div className="mateFields"><span>{t.name}</span><DraftInput key={wheel.id + 'name'} value={wheel.name} maxLength={80} onSave={v => edit({ wheels: wb.wheels.map(w => w.id === wheel.id ? { ...w, name: v } : w) })}/><span>{t.nameEn}</span><DraftInput key={wheel.id + 'en'} value={wheel.nameEn} maxLength={80} onSave={v => edit({ wheels: wb.wheels.map(w => w.id === wheel.id ? { ...w, nameEn: v } : w) })}/></div></div></ExpanderRow>
         <SettingRow icon={<DataPie24Regular/>} title={t.spokeCount} description={t.spokeCountHelp}>
           <Choice label={t.spokeCount} value={String(wheel.slotCount)}
             options={Array.from({ length: WHEEL_SLOT_LIMITS.max - WHEEL_SLOT_LIMITS.min + 1 }, (_, i) => { const n = WHEEL_SLOT_LIMITS.min + i; return { id: String(n), name: t.spokes(n) }; })}
@@ -215,7 +246,7 @@ export function SettingsApp() {
           onPreview={effect => { void flush().then(ok => { if (ok) void invoke({ type: 'previewEffect', effect }); }); }}/>
         <div className="card mate wdBindings"><div className="mateHead"><b>{t.bindActions}</b></div><span className="desc">{t.slotNameHelp}</span>
           {effects.map((effect, i) => <div className="wdBinding" key={i}>
-            <img src={textureUrl(ALL_PINGS.find(p => p.id === effect)?.icon ?? FALLBACK_TEXTURE)} alt=""/>
+            <span className="wdBindingSocket"><img src={textureUrl(ALL_PINGS.find(p => p.id === effect)?.icon ?? FALLBACK_TEXTURE)} alt=""/></span>
             <div><b>{slotLabels[i]}</b><span className="desc">{upstream.pingNames[effect]}</span></div>
             <div className="wdBindingControls">
               <label><span className="desc">{t.slotName}</span><DraftInput key={`${wheel.id}-${i}`} value={wheel.slotNames[i] ?? ''} maxLength={80}
@@ -258,7 +289,7 @@ export function SettingsApp() {
               onChange={(_, d) => patchCustom({ instruction: d.value, source: action.aiCustom?.description ?? '' })}/></EditField>
             <EditField label={t.aiFeedback} hint={t.aiFeedbackHint}><Textarea aria-label={t.aiFeedback} value={action.aiCustom.feedback} rows={2} maxLength={4000}
               onChange={(_, d) => patchCustom({ feedback: d.value })}/></EditField>
-            <div className="wdButtons"><Button appearance="primary" disabled={!action.aiCustom.description.trim()} onClick={() => void prepareAI()}>
+            <div className="wdButtons"><Button className="wdBtnPrimary" appearance="primary" disabled={!action.aiCustom.description.trim()} onClick={() => void prepareAI()}>
               {action.aiCustom.instruction ? t.aiRegenerate : t.aiGenerate}</Button></div>
             <p className="desc">{t.aiCostHint}</p>
           </>}
@@ -298,7 +329,7 @@ export function SettingsApp() {
               {modelIds.filter(id => !modelQuery || id.toLowerCase().includes(modelQuery.toLowerCase())).map(id => <Option key={id} value={id} text={id}>{id}</Option>)}
             </Combobox><Button disabled={pending} onClick={() => void modelRequest('check')}>{modelOperation === 'check' ? t.fetchingModels : t.check}</Button></div>
           </EditField>
-          <div className="wdButtons"><Button appearance="primary" disabled={pending} onClick={() => void modelRequest('testModel')}>{modelOperation === 'testModel' ? t.connecting : t.saveAndTest}</Button>
+          <div className="wdButtons"><Button className="wdBtnPrimary" appearance="primary" disabled={pending} onClick={() => void modelRequest('testModel')}>{modelOperation === 'testModel' ? t.connecting : t.saveAndTest}</Button>
             <Button disabled={pending || wb.defaultProfileId === profile.id} onClick={() => edit({ defaultProfileId: profile.id })}>{wb.defaultProfileId === profile.id ? t.isDefaultModel : t.makeDefaultModel}</Button></div>
           <p className="desc">{t.connectionHint}</p>
           {modelStatus && <p role="status" className={modelStatus.error ? 'wdError' : 'wdModelSuccess'}>{modelStatus.text}</p>}
@@ -311,7 +342,7 @@ export function SettingsApp() {
                 <Button disabled={pending || (!state.keysUnchecked && !state.keyIds.includes(profile.id))} onClick={() => { if (window.confirm(t.clearKeyConfirm)) void modelRequest('clearKey'); }}>{t.clearKey}</Button></div>
             </div>
           </ExpanderRow>
-        </fieldset></div> : <div className="card notes"><div className="lbl">{t.noModels}</div><Button appearance="primary" onClick={() => { const id = uid(); edit({ profiles: [{ id, name: 'OpenAI', kind: 'builtin', provider: 'openai', protocol: 'openai', baseUrl: 'https://api.openai.com/v1', model: '', tagColor: 3, tagColorCustom: null }], defaultProfileId: id }); setProfileId(id); }}>{t.newModel}</Button></div>}
+        </fieldset></div> : <div className="card notes"><div className="lbl">{t.noModels}</div><Button className="wdBtnPrimary" appearance="primary" onClick={() => { const id = uid(); edit({ profiles: [{ id, name: 'OpenAI', kind: 'builtin', provider: 'openai', protocol: 'openai', baseUrl: 'https://api.openai.com/v1', model: '', tagColor: 3, tagColorCustom: null }], defaultProfileId: id }); setProfileId(id); }}>{t.newModel}</Button></div>}
         <div className="section" id="general">{t.general}</div>
         <SwitchRow icon={<Rocket24Regular/>} title={t.launch} description={upstream.launchAtStartupDesc} checked={draft.launchAtStartup} onChange={launchAtStartup => changeSettings({ launchAtStartup })}/>
         <SettingRow icon={<LocalLanguage24Regular/>} title={t.language}><Choice label={t.language} value={draft.language} options={[{ id: 'auto', name: t.auto }, { id: 'zh-CN', name: '简体中文' }, { id: 'en', name: 'English' }]} onChange={language => changeSettings({ language: language as Settings['language'] })}/></SettingRow>
@@ -319,6 +350,16 @@ export function SettingsApp() {
         {state.platform === 'mac' && <div className="card notes"><div className="wdButtons"><Button onClick={() => void invoke({ type: 'accessibility' })}>{t.accessibility}</Button><Button onClick={() => void invoke({ type: 'screenPermission' })}>{t.screenPermission}</Button></div></div>}
         <SettingRow icon={<Info24Regular/>} title={t.about} description={t.privacy}><Button onClick={() => void invoke({ type: 'data' })}>{t.data}</Button></SettingRow>
       </main>
+      <footer className="wdFooterBar">
+        <div className="wdFooterStatus">
+          <span className={`wdFooterDot ${failed ? 'err' : statusKind}`}/>
+          <span role="status" className={failed ? 'wdError' : 'wdFooterMsg'}>{message || statusTitle}</span>
+        </div>
+        <div className="wdFooterActions">
+          <Button disabled={aiPending} onClick={() => { const effect = effects[0] ?? 'allin'; void flush().then(ok => { if (ok) void invoke({ type: 'previewEffect', effect }); }); }}>{t.preview}</Button>
+          <Button className="wdBtnPrimary" appearance="primary" disabled={aiPending} onClick={() => void flush()}>{t.save}</Button>
+        </div>
+      </footer>
     </div>
   </TextContext.Provider></FluentProvider>;
 }

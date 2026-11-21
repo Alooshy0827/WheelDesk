@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ClipboardItem, clipboard, ipcMain, Menu, nativeImage, nativeTheme, safeStorage, screen, shell, systemPreferences, Tray } from 'electron';
+import { app, BrowserWindow, ClipboardItem, clipboard, ipcMain, Menu, nativeImage, safeStorage, screen, shell, systemPreferences, Tray } from 'electron';
 import { join } from 'node:path';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -64,17 +64,12 @@ function broadcast(): void {
 }
 async function showSettings(): Promise<void> {
   if (!settingsWindow || settingsWindow.isDestroyed()) {
-    settingsWindow = deskWindow({ title: 'WheelDesk', width: 980, height: 680, minWidth: 900, minHeight: 520,
-      ...(mac ? { vibrancy: 'sidebar', visualEffectState: 'active', backgroundColor: '#00000000',
-        titleBarStyle: 'hiddenInset', trafficLightPosition: { x: 20, y: 19 } }
-        : { backgroundMaterial: 'mica', backgroundColor: '#00000000', titleBarStyle: 'hidden',
-          titleBarOverlay: { color: '#00000000', symbolColor: nativeTheme.shouldUseDarkColors ? '#ffffff' : '#1a1a1a', height: 40 } }),
+    settingsWindow = deskWindow({ title: 'WheelDesk', width: 1020, height: 700, minWidth: 900, minHeight: 540,
+      ...(mac ? { backgroundColor: '#010a13',
+        titleBarStyle: 'hiddenInset', trafficLightPosition: { x: 24, y: 18 } }
+        : { backgroundColor: '#010a13', titleBarStyle: 'hidden',
+          titleBarOverlay: { color: '#061018', symbolColor: '#c8aa6e', height: 48 } }),
     });
-    const window = settingsWindow;
-    const onTheme = () => { if (!mac && !window.isDestroyed()) window.setTitleBarOverlay({ color: '#00000000', symbolColor: nativeTheme.shouldUseDarkColors ? '#ffffff' : '#1a1a1a', height: 40 }); };
-    nativeTheme.on('updated', onTheme);
-    window.on('closed', () => nativeTheme.off('updated', onTheme));
-    if (mac) window.on('restore', () => { window.setVibrancy(null); window.setVibrancy('sidebar'); });
     settingsWindow.on('close', event => { if (!quitting) { event.preventDefault(); settingsWindow?.hide(); } });
     settingsReady = loadDesk(settingsWindow, 'settings');
   }
@@ -86,7 +81,7 @@ async function showResult(focus = false, stillNeeded: () => boolean = () => true
     const d = screen.getDisplayNearestPoint(screen.getCursorScreenPoint());
     resultWindow = deskWindow({ title: 'WheelDesk', width: 440, height: 500, minWidth: 360, minHeight: 300,
       x: d.workArea.x + d.workArea.width - 464, y: d.workArea.y + 32, alwaysOnTop: true,
-      skipTaskbar: true, focusable: focus });
+      backgroundColor: '#010a13', skipTaskbar: true, focusable: focus });
     resultWindow.on('close', event => {
       if (!quitting) { event.preventDefault(); if (requestedInput) runner.cancel(); resultWindow?.hide(); }
     });

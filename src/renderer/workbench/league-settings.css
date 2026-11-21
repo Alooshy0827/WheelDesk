@@ -1,0 +1,1151 @@
+/* 1:1 League of Legends In-Game Options (ESC Menu) UI for WheelDesk. */
+
+@font-face {
+  font-family: 'Cinzel';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('/fonts/cinzel-700.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Barlow Condensed';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('/fonts/barlow-condensed-700.woff2') format('woff2');
+}
+
+body.settings {
+  color-scheme: dark;
+  background: #010a13;
+  --lol-gold-1: #f0e6d2;
+  --lol-gold-2: #cdbe91;
+  --lol-gold-3: #c8aa6e;
+  --lol-gold-4: #785a28;
+  --lol-gold-5: #463714;
+  --lol-grey-1: #a09b8c;
+  --lol-grey-2: #5b5a56;
+  --lol-grey-3: #3c3c41;
+  --lol-teal: #0ac8b9;
+  --lol-teal-deep: #0a323c;
+  --lol-red: #e84057;
+  --lol-hextech: #010a13;
+  --lol-panel: #07121b;
+  --lol-panel-2: #0a1824;
+  --lol-display: 'Cinzel', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei UI', 'Noto Sans CJK SC', -apple-system, sans-serif;
+  --lol-sans: 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei UI', 'Noto Sans CJK SC', -apple-system, sans-serif;
+  --lol-hud: 'Barlow Condensed', 'DIN Alternate', 'Bahnschrift', sans-serif;
+}
+
+:root[data-platform] body.settings,
+body.settings {
+  font: 13px/1.45 var(--lol-sans);
+  color: var(--lol-gold-1);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ---------- Outer In-Game ESC Options Window Frame ---------- */
+:root[data-platform] .app.wdSettings,
+.app.wdSettings {
+  position: relative;
+  box-sizing: border-box;
+  display: grid;
+  grid-template-rows: 50px minmax(0, 1fr) 54px;
+  grid-template-columns: 224px minmax(0, 1fr);
+  height: 100%;
+  background:
+    radial-gradient(ellipse 85% 42% at 62% 0%, rgba(10, 102, 118, 0.22), transparent 64%),
+    radial-gradient(ellipse 46% 36% at 14% 100%, rgba(120, 90, 40, 0.14), transparent 68%),
+    linear-gradient(180deg, #06111a 0%, #020a11 100%);
+  border: 2px solid var(--lol-gold-4);
+  box-shadow:
+    inset 0 0 0 1px #010a13,
+    inset 0 0 0 2px rgba(200, 170, 110, 0.34),
+    inset 0 1px 0 rgba(240, 230, 210, 0.25);
+  overflow: hidden;
+  --card: rgba(7, 18, 27, 0.9);
+  --card-hover: rgba(13, 29, 41, 0.95);
+  --stroke: rgba(120, 90, 40, 0.45);
+  --text3: var(--lol-grey-1);
+  --mac-content: transparent;
+  --mac-row: rgba(7, 18, 27, 0.9);
+  --mac-sep: rgba(120, 90, 40, 0.38);
+  --mac-sub: var(--lol-grey-1);
+  --mac-track: #040b11;
+  --mac-sel: rgba(200, 170, 110, 0.16);
+  --nav-sel: rgba(200, 170, 110, 0.16);
+}
+
+/* Crisp game-UI opening: no sluggish row fade-in or diamond un-rotation. */
+.wdSettings main.content > *,
+.wdSettings .card,
+.wdSettings .dot,
+.wdSettings .navItem,
+.wdSettings .brand {
+  animation: none !important;
+}
+
+/* Four ornate Hextech brass corner brackets */
+.wdCorner {
+  position: absolute;
+  z-index: 30;
+  width: 22px;
+  height: 22px;
+  pointer-events: none;
+  filter: drop-shadow(0 0 5px rgba(200, 170, 110, 0.35));
+}
+.wdCorner.tl { top: 2px; left: 2px; }
+.wdCorner.tr { top: 2px; right: 2px; transform: scaleX(-1); }
+.wdCorner.bl { bottom: 2px; left: 2px; transform: scaleY(-1); }
+.wdCorner.br { bottom: 2px; right: 2px; transform: scale(-1); }
+
+/* ---------- Top Header Bar ("WHEELDESK · 选项") ---------- */
+:root[data-platform] .wdSettings .titlebar,
+.wdSettings .titlebar {
+  position: relative;
+  z-index: 10;
+  grid-column: 1 / -1;
+  grid-row: 1;
+  inset: auto;
+  height: 50px;
+  padding: 0 22px;
+  display: grid;
+  grid-template-columns: 150px 1fr 150px;
+  align-items: center;
+  gap: 8px;
+  background:
+    radial-gradient(ellipse 44% 110% at 50% 0%, rgba(200, 170, 110, 0.14), transparent 72%),
+    linear-gradient(180deg, #0c1d28 0%, #061018 72%, #030a10 100%);
+  border-bottom: 1px solid var(--lol-gold-5);
+  box-shadow:
+    inset 0 -1px 0 rgba(200, 170, 110, 0.24),
+    0 2px 10px rgba(0, 0, 0, 0.55);
+  -webkit-app-region: drag;
+}
+.wdSettings .titlebar::after {
+  content: '';
+  position: absolute;
+  left: 16%;
+  right: 16%;
+  bottom: -1px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--lol-gold-3) 35%, var(--lol-gold-1) 50%, var(--lol-gold-3) 65%, transparent);
+  pointer-events: none;
+}
+
+.wdTitleCenter {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-width: 0;
+}
+.wdFiligree {
+  flex: 1;
+  max-width: 84px;
+  height: 1px;
+  position: relative;
+}
+.wdFiligree.left {
+  background: linear-gradient(90deg, transparent, var(--lol-gold-4) 45%, var(--lol-gold-3));
+}
+.wdFiligree.right {
+  background: linear-gradient(90deg, var(--lol-gold-3), var(--lol-gold-4) 55%, transparent);
+}
+.wdFiligree.left::after,
+.wdFiligree.right::before {
+  content: '';
+  position: absolute;
+  top: -2.5px;
+  width: 5px;
+  height: 5px;
+  background: var(--lol-gold-3);
+  transform: rotate(45deg);
+}
+.wdFiligree.left::after { right: -1px; }
+.wdFiligree.right::before { left: -1px; }
+
+.wdTitleCrest {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: radial-gradient(circle, #0e3540 0%, #041018 85%);
+  border: 1px solid var(--lol-gold-3);
+  box-shadow: 0 0 8px rgba(10, 200, 185, 0.25);
+}
+:root[data-platform] .wdSettings .titlebar .wdTitleCrest img,
+.wdSettings .titlebar .wdTitleCrest img {
+  display: block;
+  width: 17px;
+  height: 17px;
+}
+.wdTitleText {
+  font-family: var(--lol-display);
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: var(--lol-gold-1);
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.85), 0 0 14px rgba(200, 170, 110, 0.26);
+  white-space: nowrap;
+}
+.wdTitleRight {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  -webkit-app-region: no-drag;
+}
+.wdLivePill {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--lol-gold-1);
+  background: linear-gradient(180deg, rgba(10, 42, 51, 0.88), rgba(5, 20, 27, 0.94));
+  border: 1px solid var(--lol-gold-4);
+  box-shadow: inset 0 1px 0 rgba(240, 230, 210, 0.14);
+  white-space: nowrap;
+}
+.wdLivePill.off {
+  background: rgba(16, 22, 27, 0.9);
+  border-color: var(--lol-grey-3);
+  color: var(--lol-grey-1);
+}
+.wdLivePill.failed {
+  background: rgba(45, 16, 22, 0.9);
+  border-color: #9e3d47;
+  color: #ffc5cb;
+}
+.wdGem {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  transform: rotate(45deg);
+  background: var(--lol-teal);
+  box-shadow: 0 0 8px var(--lol-teal);
+}
+.wdLivePill.off .wdGem { background: var(--lol-grey-2); box-shadow: none; }
+.wdLivePill.failed .wdGem { background: var(--lol-red); box-shadow: 0 0 8px var(--lol-red); }
+
+/* ---------- Left Category Sidebar (1:1 ESC Menu Left Column) ---------- */
+:root[data-platform] .wdSettings nav.side,
+.wdSettings nav.side {
+  position: relative;
+  isolation: isolate;
+  grid-column: 1;
+  grid-row: 2;
+  padding: 16px 0 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  background:
+    radial-gradient(ellipse 95% 45% at 0% 32%, rgba(10, 74, 88, 0.2), transparent 72%),
+    linear-gradient(180deg, #07131c 0%, #040b11 65%, #02070c 100%);
+  border-right: 1px solid var(--lol-gold-5);
+  box-shadow: inset -1px 0 0 rgba(200, 170, 110, 0.16);
+  -webkit-app-region: no-drag;
+}
+
+:root[data-platform] .wdSettings .brand,
+.wdSettings .brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 4px 16px 16px;
+  border-bottom: 1px solid rgba(120, 90, 40, 0.34);
+  margin-bottom: 10px;
+}
+.wdPortraitRing {
+  position: relative;
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 50% 35%, #164854 0%, #081e27 65%, #030b10 100%);
+  border: 2px solid var(--lol-gold-3);
+  box-shadow:
+    0 0 0 1px #010a13,
+    0 0 0 3px var(--lol-gold-5),
+    0 0 14px rgba(10, 200, 185, 0.25);
+}
+:root[data-platform] .wdSettings .brand img,
+.wdSettings .brand img {
+  width: 32px;
+  height: 32px;
+  filter: drop-shadow(0 2px 5px rgba(0, 0, 0, 0.7));
+}
+:root[data-platform] .wdSettings .brand b,
+.wdSettings .brand b {
+  font-family: var(--lol-display);
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: var(--lol-gold-1);
+}
+.wdSettings .brand .desc {
+  color: var(--lol-grey-1);
+  font-size: 11px;
+  margin-top: 2px;
+}
+
+.wdNavGroupLabel {
+  padding: 4px 16px 8px;
+  font-family: var(--lol-display);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--lol-gold-4);
+}
+
+:root[data-platform] .wdSettings .navBar,
+.wdSettings .navBar {
+  display: none;
+}
+
+:root[data-platform] .wdSettings .navItem,
+.wdSettings .navItem {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 40px;
+  padding: 0 16px;
+  border: 0;
+  border-top: 1px solid transparent;
+  border-bottom: 1px solid rgba(70, 55, 20, 0.34);
+  border-radius: 0;
+  background: transparent;
+  color: var(--lol-gold-2);
+  font-family: var(--lol-sans);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9);
+  cursor: pointer;
+}
+:root[data-platform] .wdSettings .navItem svg,
+:root[data-platform] .wdSettings .navItem:nth-of-type(n) svg,
+.wdSettings .navItem svg {
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--lol-gold-4);
+  flex: none;
+}
+.wdNavDiamond {
+  width: 6px;
+  height: 6px;
+  flex: none;
+  border: 1px solid var(--lol-gold-5);
+  background: transparent;
+  transform: rotate(45deg);
+  transition: background-color 140ms ease, border-color 140ms ease, box-shadow 140ms ease;
+}
+:root[data-platform] .wdSettings .navItem:hover,
+.wdSettings .navItem:hover {
+  background: linear-gradient(90deg, rgba(200, 170, 110, 0.12), rgba(200, 170, 110, 0.02));
+  color: var(--lol-gold-1);
+}
+:root[data-platform] .wdSettings .navItem:hover svg,
+.wdSettings .navItem:hover svg {
+  color: var(--lol-gold-3);
+}
+:root[data-platform] .wdSettings .navItem.sel,
+.wdSettings .navItem.sel {
+  color: var(--lol-gold-1);
+  background: linear-gradient(90deg, rgba(200, 170, 110, 0.26) 0%, rgba(120, 90, 40, 0.14) 60%, rgba(8, 22, 31, 0.02) 100%);
+  border-top-color: rgba(200, 170, 110, 0.58);
+  border-bottom-color: rgba(200, 170, 110, 0.48);
+  box-shadow: inset 3px 0 0 var(--lol-gold-3), inset 0 0 18px rgba(200, 170, 110, 0.08);
+  text-shadow: 0 0 10px rgba(200, 170, 110, 0.4);
+}
+:root[data-platform] .wdSettings .navItem.sel svg,
+.wdSettings .navItem.sel svg {
+  color: var(--lol-gold-1);
+  filter: drop-shadow(0 0 4px rgba(200, 170, 110, 0.5));
+}
+.wdSettings .navItem.sel .wdNavDiamond {
+  border-color: var(--lol-gold-1);
+  background: var(--lol-gold-3);
+  box-shadow: 0 0 7px rgba(200, 170, 110, 0.85);
+}
+
+/* Engraved Runic Compass Seal watermark in empty sidebar space */
+.wdCompassSeal {
+  position: absolute;
+  z-index: -1;
+  pointer-events: none;
+  left: calc(50% - 72px);
+  bottom: 54px;
+  width: 144px;
+  height: 144px;
+  opacity: 0.42;
+  border: 1px solid rgba(200, 170, 110, 0.35);
+  border-radius: 50%;
+  background: repeating-conic-gradient(from -0.5deg, rgba(200, 170, 110, 0.4) 0 1deg, transparent 1deg 15deg);
+  mask-image: radial-gradient(circle, #000 56%, transparent 57% 63%, #000 64%);
+}
+.wdCompassSeal i {
+  position: absolute;
+  inset: 12%;
+  border: 1px solid rgba(200, 170, 110, 0.36);
+  border-radius: 50%;
+  background: repeating-radial-gradient(circle, transparent 0 20px, rgba(200, 170, 110, 0.16) 21px, transparent 22px 30px), #050f17;
+  transform: rotate(22deg);
+}
+.wdCompassSeal i::before,
+.wdCompassSeal i::after {
+  content: '';
+  position: absolute;
+  inset: 6% 38%;
+  clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%);
+  background: conic-gradient(#c8aa6e 0 25%, #463714 25% 50%, #785a28 50% 75%, #163b42 75%);
+}
+.wdCompassSeal i::before { transform: rotate(90deg) scale(0.72); opacity: 0.65; }
+@media (max-height: 580px) { .wdCompassSeal { display: none; } }
+
+.wdSidebarFoot {
+  margin-top: auto;
+  padding: 12px 16px 4px;
+  border-top: 1px solid rgba(70, 55, 20, 0.38);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.wdVersionBadge {
+  font-family: var(--lol-hud), var(--lol-sans);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--lol-grey-1);
+}
+
+/* ---------- Main Scrollable Settings Canvas ---------- */
+:root[data-platform] .wdSettings main.content,
+.wdSettings main.content {
+  grid-column: 2;
+  grid-row: 2;
+  margin-top: 0;
+  padding: 18px 28px 34px;
+  overflow-y: auto;
+  background: transparent;
+}
+:root[data-platform] .wdSettings main.content > *,
+.wdSettings main.content > * {
+  max-width: 720px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/* Authentic LOL Metallic Gold Scrollbar on all platforms */
+.wdSettings main.content::-webkit-scrollbar,
+.wdSettings .weTiles::-webkit-scrollbar,
+.fui-Listbox::-webkit-scrollbar {
+  width: 7px;
+  height: 7px;
+  background: #02080e;
+}
+.wdSettings main.content::-webkit-scrollbar-track,
+.wdSettings .weTiles::-webkit-scrollbar-track,
+.fui-Listbox::-webkit-scrollbar-track {
+  background: #02080e;
+  border-left: 1px solid rgba(70, 55, 20, 0.45);
+}
+.wdSettings main.content::-webkit-scrollbar-thumb,
+.wdSettings .weTiles::-webkit-scrollbar-thumb,
+.fui-Listbox::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, var(--lol-gold-3), var(--lol-gold-4));
+  border: 1px solid #010a13;
+  border-radius: 0;
+}
+.wdSettings main.content::-webkit-scrollbar-thumb:hover,
+.wdSettings .weTiles::-webkit-scrollbar-thumb:hover,
+.fui-Listbox::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, var(--lol-gold-1), var(--lol-gold-3));
+}
+
+/* Category Header Banner */
+.wdPageBanner {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 2px 0 12px;
+  margin-bottom: 14px;
+  border-bottom: 1px solid var(--lol-gold-5);
+  position: relative;
+}
+.wdPageBanner::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  bottom: -1px;
+  width: 140px;
+  height: 2px;
+  background: linear-gradient(90deg, var(--lol-gold-3), transparent);
+}
+:root[data-platform] .wdSettings .pageTitle,
+.wdSettings .pageTitle {
+  display: block;
+  margin: 0;
+  font-family: var(--lol-display);
+  font-size: 21px;
+  line-height: 26px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--lol-gold-1);
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.8);
+}
+.wdPageSub {
+  font-size: 12px;
+  color: var(--lol-grey-1);
+}
+
+/* Section Headers (◆ 触发方式 ──────────) */
+:root[data-platform] .wdSettings .section,
+.wdSettings .section {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 24px auto 10px;
+  padding: 0 2px;
+  font-family: var(--lol-display);
+  font-size: 13.5px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--lol-gold-3);
+}
+.wdSettings .section::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  flex: none;
+  background: var(--lol-gold-3);
+  transform: rotate(45deg);
+  box-shadow: 0 0 6px rgba(200, 170, 110, 0.55);
+}
+.wdSettings .section::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg, rgba(200, 170, 110, 0.65), rgba(70, 55, 20, 0.45) 55%, transparent);
+}
+
+/* ---------- 1:1 LOL In-Game Option Boxes (Replacing Apple Rounded Cards) ---------- */
+:root[data-platform] .wdSettings .card,
+.wdSettings .card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-height: 56px;
+  padding: 12px 16px;
+  margin: 0 auto 6px;
+  border-radius: 1px !important;
+  border: 1px solid rgba(120, 90, 40, 0.45) !important;
+  background: linear-gradient(180deg, rgba(10, 24, 35, 0.92) 0%, rgba(5, 14, 21, 0.96) 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(240, 230, 210, 0.08),
+    0 2px 6px rgba(0, 0, 0, 0.35);
+}
+:root[data-platform] .wdSettings .card:hover,
+.wdSettings .card:hover {
+  background: linear-gradient(180deg, rgba(14, 33, 46, 0.95) 0%, rgba(8, 20, 30, 0.97) 100%);
+  border-color: rgba(200, 170, 110, 0.65) !important;
+}
+:root[data-platform] .wdSettings .card + .card,
+.wdSettings .card + .card {
+  border-top: 1px solid rgba(120, 90, 40, 0.45) !important;
+}
+:root[data-platform] .wdSettings .card .icon,
+.wdSettings .card .icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  flex: none;
+  color: var(--lol-gold-3);
+  background: rgba(2, 10, 17, 0.78);
+  border: 1px solid rgba(120, 90, 40, 0.48);
+}
+.wdSettings .card .icon svg { width: 17px; height: 17px; }
+.wdSettings .card .lbl { color: var(--lol-gold-1); font-weight: 600; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.85); }
+:root[data-platform] .wdSettings .desc,
+.wdSettings .desc {
+  color: var(--lol-grey-1);
+  font-size: 12px;
+  line-height: 1.45;
+  margin-top: 3px;
+}
+
+/* Hero In-Game Status Banner */
+:root[data-platform] .wdSettings .card.status,
+.wdSettings .card.status {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  padding: 16px 18px;
+  margin-bottom: 12px;
+  border: 1px solid var(--lol-gold-3) !important;
+  background:
+    radial-gradient(ellipse 65% 110% at 8% 0%, rgba(10, 200, 185, 0.2), transparent 64%),
+    radial-gradient(ellipse 45% 80% at 96% 100%, rgba(200, 170, 110, 0.14), transparent 64%),
+    linear-gradient(120deg, #0b222d 0%, #071620 55%, #040d15 100%);
+  box-shadow:
+    inset 0 0 0 3px rgba(1, 10, 19, 0.72),
+    inset 0 0 0 4px rgba(200, 170, 110, 0.26),
+    0 6px 20px rgba(0, 0, 0, 0.5);
+}
+.wdSettings .card.status::before {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  inset: 0 0 0 46%;
+  pointer-events: none;
+  background:
+    repeating-radial-gradient(circle at 82% 145%, transparent 0 24px, rgba(200, 170, 110, 0.14) 25px, transparent 26px 40px),
+    linear-gradient(58deg, transparent 49.4%, rgba(200, 170, 110, 0.18) 50%, transparent 50.6%);
+  mask-image: linear-gradient(90deg, transparent, #000 38%);
+}
+:root[data-platform] .wdSettings .card.status .dot,
+.wdSettings .card.status .dot {
+  display: block;
+  width: 9px;
+  height: 9px;
+  flex: none;
+  border-radius: 0;
+  transform: rotate(45deg);
+  background: var(--lol-teal);
+  box-shadow: 0 0 10px var(--lol-teal);
+}
+.wdSettings .card.status .dot.off { background: var(--lol-grey-2); box-shadow: none; }
+.wdSettings .card.status .dot.failed { background: var(--lol-red); box-shadow: 0 0 10px var(--lol-red); }
+.wdStatusRing {
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  flex: none;
+  border-radius: 50%;
+  background: radial-gradient(circle, #14444f 0%, #05131c 78%);
+  border: 2px solid var(--lol-gold-3);
+  box-shadow: 0 0 0 2px #010a13, 0 0 0 3px var(--lol-gold-4), 0 0 14px rgba(10, 200, 185, 0.28);
+}
+:root[data-platform] .wdSettings .statusPing,
+.wdSettings .statusPing {
+  display: block;
+  width: 36px;
+  height: 36px;
+  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.75));
+}
+:root[data-platform] .wdSettings .card.status b,
+.wdSettings .card.status b {
+  font-family: var(--lol-display);
+  font-size: 16px !important;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  color: var(--lol-gold-1);
+}
+
+/* Permission Warning Card */
+:root[data-platform] .wdSettings .card.permission,
+.wdSettings .card.permission {
+  border: 1px solid #c97a2b !important;
+  background: linear-gradient(120deg, rgba(58, 28, 12, 0.92), rgba(24, 14, 10, 0.95));
+  box-shadow: inset 0 0 0 3px rgba(1, 10, 19, 0.65), inset 0 0 0 4px rgba(201, 122, 43, 0.3);
+  margin-bottom: 12px;
+}
+:root[data-platform] .wdSettings .card.permission .icon,
+.wdSettings .card.permission .icon {
+  color: #ffb85c;
+  border-color: #c97a2b;
+}
+
+/* Expander Rows (1:1 Collapsible LOL Hotkey Group) */
+:root[data-platform] .wdSettings .card.expander,
+.wdSettings .card.expander {
+  display: block;
+  padding: 0;
+}
+:root[data-platform] .wdSettings .card.expander:hover,
+.wdSettings .card.expander:hover {
+  background: linear-gradient(180deg, rgba(10, 24, 35, 0.92) 0%, rgba(5, 14, 21, 0.96) 100%);
+}
+:root[data-platform] .wdSettings .expHead,
+.wdSettings .expHead {
+  min-height: 52px;
+  padding: 10px 12px 10px 16px;
+  gap: 14px;
+  border-radius: 0;
+}
+:root[data-platform] .wdSettings .expHead:hover,
+.wdSettings .expHead:hover {
+  background: rgba(200, 170, 110, 0.08);
+}
+.wdSettings .expChevron {
+  color: var(--lol-gold-3);
+  border: 1px solid rgba(120, 90, 40, 0.4);
+  border-radius: 1px;
+  background: rgba(2, 10, 17, 0.6);
+}
+.wdSettings .expChevron:hover {
+  border-color: var(--lol-gold-3);
+  background: rgba(200, 170, 110, 0.14);
+  color: var(--lol-gold-1);
+}
+:root[data-platform] .wdSettings .expBody,
+.wdSettings .expBody {
+  border-top: 1px solid rgba(120, 90, 40, 0.42);
+  background: rgba(3, 9, 14, 0.72);
+}
+:root[data-platform] .wdSettings .expBody > .card,
+.wdSettings .expBody > .card {
+  min-height: 48px;
+  margin: 0;
+  padding: 10px 24px 10px 26px;
+  border: 0 !important;
+  box-shadow: none;
+  background: transparent;
+}
+:root[data-platform] .wdSettings .expBody > * + .card,
+.wdSettings .expBody > * + .card {
+  border-top: 1px solid rgba(70, 55, 20, 0.42) !important;
+}
+:root[data-platform] .wdSettings .expPane,
+.wdSettings .expPane {
+  padding: 14px 18px 16px;
+}
+
+/* ---------- 1:1 Authentic LOL Checkboxes (Replacing iOS Pill Switches) ---------- */
+:root[data-platform] .wdSettings .fui-Switch,
+.wdSettings .fui-Switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+:root[data-platform] .wdSettings .fui-Switch__label,
+.wdSettings .fui-Switch__label {
+  display: inline-block !important;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--lol-gold-2);
+  padding: 0 2px;
+}
+:root[data-platform] .wdSettings .fui-Switch__indicator,
+.wdSettings .fui-Switch__indicator {
+  position: relative;
+  width: 20px !important;
+  height: 20px !important;
+  min-width: 20px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border-radius: 1px !important;
+  border: 1.5px solid var(--lol-gold-4) !important;
+  background: linear-gradient(180deg, #03090f, #08131d) !important;
+  box-shadow: inset 0 1px 4px rgba(0, 0, 0, 0.85) !important;
+  transition: border-color 140ms ease, background 140ms ease, box-shadow 140ms ease !important;
+}
+.wdSettings .fui-Switch:hover .fui-Switch__indicator {
+  border-color: var(--lol-gold-3) !important;
+}
+.wdSettings .fui-Switch__indicator svg {
+  display: none !important;
+}
+.wdSettings .fui-Switch__indicator::after {
+  content: '';
+  position: absolute;
+  left: 6px;
+  top: 2px;
+  width: 5px;
+  height: 10px;
+  border-right: 2.2px solid transparent;
+  border-bottom: 2.2px solid transparent;
+  transform: rotate(42deg) scale(0.7);
+  opacity: 0;
+  transition: opacity 120ms ease, transform 120ms ease;
+}
+:root[data-platform] .wdSettings .fui-Switch__input:checked ~ .fui-Switch__indicator,
+.wdSettings .fui-Switch__input:checked ~ .fui-Switch__indicator {
+  border-color: var(--lol-gold-3) !important;
+  background: linear-gradient(180deg, #174954 0%, #0a2a33 100%) !important;
+  box-shadow:
+    inset 0 0 6px rgba(10, 200, 185, 0.35),
+    0 0 8px rgba(10, 200, 185, 0.32) !important;
+}
+.wdSettings .fui-Switch__input:checked ~ .fui-Switch__indicator::after {
+  border-right-color: var(--lol-gold-1);
+  border-bottom-color: var(--lol-gold-1);
+  opacity: 1;
+  transform: rotate(42deg) scale(1);
+}
+.wdSettings .fui-Switch__input:checked ~ .fui-Switch__label {
+  color: var(--lol-teal);
+}
+
+/* ---------- 1:1 Authentic LOL Sliders (Gold Bar + Faceted Diamond Gem Thumb) ---------- */
+.wdSettings .fui-Slider {
+  --fui-Slider__rail--size: 6px;
+  --fui-Slider__thumb--size: 14px;
+}
+.wdSettings .fui-Slider__rail {
+  height: 6px !important;
+  border-radius: 0 !important;
+  background: #02080d !important;
+  border: 1px solid var(--lol-gold-5) !important;
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.85);
+}
+.wdSettings .fui-Slider__rail::before {
+  border-radius: 0 !important;
+  background: linear-gradient(
+    90deg,
+    #694e1f 0%,
+    var(--lol-gold-3) calc(var(--fui-Slider--progress) * 0.78),
+    var(--lol-gold-1) var(--fui-Slider--progress),
+    transparent var(--fui-Slider--progress)
+  ) !important;
+}
+.wdSettings .fui-Slider__thumb {
+  width: 14px !important;
+  height: 14px !important;
+  border-radius: 1px !important;
+  transform: translateX(-50%) rotate(45deg) !important;
+  background: linear-gradient(135deg, var(--lol-gold-1) 0%, var(--lol-gold-3) 55%, var(--lol-gold-4) 100%) !important;
+  border: 1.5px solid #2b200c !important;
+  box-shadow: 0 0 0 1px var(--lol-gold-3), 0 0 8px rgba(200, 170, 110, 0.55) !important;
+}
+.wdSettings .fui-Slider__thumb::before {
+  display: none !important;
+}
+.wdSettings .value {
+  min-width: 62px;
+  padding: 3px 8px;
+  text-align: center;
+  font-family: var(--lol-hud);
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--lol-gold-1);
+  background: #030a10;
+  border: 1px solid var(--lol-gold-5);
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.7);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9);
+}
+
+/* ---------- 1:1 Authentic LOL Beveled Metallic Buttons ---------- */
+.wdSettings .fui-Button {
+  border-radius: 1px !important;
+  font-family: var(--lol-sans);
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  color: var(--lol-gold-2);
+  background: linear-gradient(180deg, #1d2329 0%, #13181d 55%, #0c1014 100%);
+  border: 1px solid var(--lol-gold-4);
+  box-shadow: inset 0 1px 0 rgba(240, 230, 210, 0.12), 0 2px 6px rgba(0, 0, 0, 0.45);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9);
+}
+.wdSettings .fui-Button:not(:disabled):hover {
+  color: var(--lol-gold-1);
+  border-color: var(--lol-gold-3);
+  background: linear-gradient(180deg, #2d291e 0%, #1d1c19 55%, #121417 100%);
+  box-shadow: inset 0 1px 0 rgba(240, 230, 210, 0.24), 0 0 10px rgba(200, 170, 110, 0.2);
+}
+.wdSettings .fui-Button:not(:disabled):active {
+  background: linear-gradient(180deg, #0d1216 0%, #161b20 100%);
+  border-color: var(--lol-gold-4);
+}
+.wdSettings .fui-Button:disabled {
+  color: #7c7769;
+  background: #0c1218;
+  border-color: #363228;
+  box-shadow: none;
+}
+.wdSettings .fui-Input__contentAfter .fui-Button {
+  min-height: 22px;
+  height: 22px;
+  padding: 0 8px;
+  font-size: 11px;
+}
+
+/* Hextech Primary Confirm Button (1:1 LOL "确认" Metallic Button) */
+.wdSettings .fui-Button.wdBtnPrimary {
+  color: var(--lol-gold-1);
+  background: linear-gradient(180deg, #12404b 0%, #0a2831 52%, #061b22 100%);
+  border: 1.5px solid var(--lol-gold-3);
+  box-shadow:
+    inset 0 1px 0 rgba(240, 230, 210, 0.28),
+    inset 0 0 12px rgba(10, 200, 185, 0.18),
+    0 2px 10px rgba(0, 0, 0, 0.55);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.75);
+}
+.wdSettings .fui-Button.wdBtnPrimary:not(:disabled):hover {
+  color: #fffaf0;
+  border-color: var(--lol-gold-1);
+  background: linear-gradient(180deg, #175765 0%, #0e3844 52%, #092630 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 250, 235, 0.35),
+    0 0 14px rgba(10, 200, 185, 0.34);
+}
+
+/* ---------- 1:1 Authentic LOL Inputs, Dropdowns & Comboboxes ---------- */
+.wdSettings .fui-Dropdown,
+.wdSettings .fui-Input,
+.wdSettings .fui-Textarea,
+.wdSettings .fui-Combobox {
+  border-radius: 1px !important;
+  background: #040b11 !important;
+  border: 1px solid var(--lol-gold-4) !important;
+  color: var(--lol-gold-1) !important;
+  box-shadow: inset 0 1px 4px rgba(0, 0, 0, 0.72);
+}
+.wdSettings .fui-Dropdown:hover,
+.wdSettings .fui-Input:hover,
+.wdSettings .fui-Textarea:hover,
+.wdSettings .fui-Combobox:hover {
+  border-color: var(--lol-gold-3) !important;
+}
+.wdSettings .fui-Dropdown:focus-within,
+.wdSettings .fui-Input:focus-within,
+.wdSettings .fui-Textarea:focus-within,
+.wdSettings .fui-Combobox:focus-within {
+  border-color: var(--lol-gold-1) !important;
+  box-shadow: inset 0 1px 4px rgba(0, 0, 0, 0.72), 0 0 0 1px rgba(200, 170, 110, 0.45);
+}
+.wdSettings .fui-Dropdown::after,
+.wdSettings .fui-Input::after,
+.wdSettings .fui-Textarea::after,
+.wdSettings .fui-Combobox::after {
+  border-bottom-color: var(--lol-gold-3) !important;
+}
+.wdSettings .fui-Dropdown__expandIcon,
+.wdSettings .fui-Combobox__expandIcon {
+  color: var(--lol-gold-3) !important;
+}
+
+.fui-Listbox {
+  background: #040c14 !important;
+  border: 1px solid var(--lol-gold-4) !important;
+  border-radius: 1px !important;
+  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.88), inset 0 0 0 1px rgba(200, 170, 110, 0.16) !important;
+}
+.fui-Option {
+  color: var(--lol-gold-2) !important;
+  border-radius: 0 !important;
+}
+.fui-Option:hover,
+.fui-Option[aria-selected="true"] {
+  background: linear-gradient(90deg, rgba(200, 170, 110, 0.2), rgba(10, 50, 60, 0.2)) !important;
+  color: var(--lol-gold-1) !important;
+}
+
+/* ---------- 1:1 Summoner's Rift Smart Ping Wheel Editor ---------- */
+:root[data-platform] .wdSettings .card.wheelEditor,
+.wdSettings .card.wheelEditor {
+  display: block;
+  padding: 18px 20px 14px;
+  border: 1px solid var(--lol-gold-4) !important;
+  background:
+    radial-gradient(circle at 170px 195px, rgba(10, 200, 185, 0.12), transparent 44%),
+    linear-gradient(180deg, rgba(8, 20, 30, 0.96) 0%, rgba(4, 11, 17, 0.98) 100%);
+}
+.wdSettings .weHead .lbl {
+  font-family: var(--lol-display);
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  color: var(--lol-gold-1);
+}
+.wdSettings .weWheel {
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(10, 28, 38, 0.95) 0%, rgba(4, 12, 18, 0.96) 66%, transparent 72%);
+  box-shadow:
+    0 0 0 1px rgba(200, 170, 110, 0.55),
+    0 0 0 5px #02090f,
+    0 0 0 6px rgba(120, 90, 40, 0.72),
+    0 0 32px rgba(10, 200, 185, 0.16);
+}
+.wdSettings .weWedge {
+  fill: rgba(14, 24, 33, 0.92);
+  stroke: rgba(200, 170, 110, 0.55);
+  stroke-width: 1.25;
+}
+.wdSettings .weWedge:hover,
+.wdSettings .weWedge.hot {
+  fill: rgba(10, 168, 174, 0.36);
+  stroke: var(--lol-gold-1);
+}
+.wdSettings .weSlot img {
+  filter: drop-shadow(0 0 6px rgba(0, 0, 0, 0.85));
+}
+.wdSettings .weSlot:hover img,
+.wdSettings .weSlot.hot img {
+  transform: scale(1.18);
+  filter: drop-shadow(0 0 10px rgba(10, 200, 185, 0.65));
+}
+.wdSettings .weCenter,
+.wdSettings .weCenter.off {
+  opacity: 1;
+  background: radial-gradient(circle at 50% 35%, #1d5d67 0%, #0b2a33 65%, #041117 100%);
+  border: 2.5px solid var(--lol-gold-3);
+  box-shadow:
+    0 0 0 3px rgba(1, 10, 19, 0.88),
+    inset 0 0 0 4px rgba(120, 90, 40, 0.38),
+    0 0 22px rgba(10, 200, 185, 0.34);
+}
+.wdSettings .weCenter span {
+  color: #2ce0d1;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.95), 0 0 8px rgba(10, 200, 185, 0.45);
+}
+
+/* Effect Pool Tiles (1:1 LOL Rune / Item Inventory Slots) */
+.wdSettings .wePoolTitle {
+  font-family: var(--lol-display);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--lol-gold-3);
+}
+:root[data-platform] .wdSettings .weTile,
+.wdSettings .weTile {
+  border-radius: 1px;
+  padding: 9px 4px 7px;
+  background: linear-gradient(180deg, #0b1822 0%, #050d14 100%);
+  border: 1px solid var(--lol-gold-5);
+  box-shadow: inset 0 1px 0 rgba(240, 230, 210, 0.08);
+  color: var(--lol-gold-2);
+  font-size: 11px;
+}
+:root[data-platform] .wdSettings .weTile:hover,
+.wdSettings .weTile:hover {
+  background: radial-gradient(circle at 50% 36%, rgba(10, 200, 185, 0.2), transparent 65%), #0f2330;
+  border-color: var(--lol-gold-3);
+  color: var(--lol-gold-1);
+  box-shadow: 0 0 10px rgba(200, 170, 110, 0.22);
+}
+.wdSettings .weTile.picked {
+  outline: none;
+  border-color: var(--lol-teal);
+  box-shadow: inset 0 0 0 1px var(--lol-gold-1), 0 0 12px rgba(10, 200, 185, 0.45);
+  color: var(--lol-gold-1);
+}
+.wdSettings .weWhere {
+  color: var(--lol-gold-3);
+  font-size: 9.5px;
+  font-weight: 700;
+  background: rgba(1, 10, 19, 0.85);
+  padding: 0 3px;
+  border: 1px solid rgba(120, 90, 40, 0.5);
+}
+
+/* ---------- Slot Binding Card & Ability Sockets ---------- */
+:root[data-platform] .wdSettings .card.mate,
+.wdSettings .card.mate {
+  display: block;
+  padding: 16px 18px;
+}
+.wdSettings .mateHead b {
+  font-family: var(--lol-display);
+  font-size: 14px;
+  letter-spacing: 0.05em;
+  color: var(--lol-gold-1);
+}
+.wdSettings .wdBinding {
+  border-bottom: 1px solid rgba(70, 55, 20, 0.48);
+  padding: 11px 0;
+}
+.wdBindingSocket {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  flex: none;
+  background: radial-gradient(circle, #102834 0%, #030a10 85%);
+  border: 1.5px solid var(--lol-gold-4);
+  box-shadow: inset 0 0 8px rgba(0, 0, 0, 0.8), 0 0 8px rgba(200, 170, 110, 0.14);
+}
+.wdBindingSocket img {
+  width: 30px;
+  height: 30px;
+  object-fit: contain;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.7));
+}
+.wdSettings .wdBinding > div > b {
+  color: var(--lol-gold-1);
+  font-weight: 600;
+}
+.wdSettings .wdField > span {
+  color: var(--lol-gold-2);
+  font-weight: 600;
+  font-size: 12.5px;
+}
+.wdSettings .mateRule {
+  border-top: 1px solid rgba(120, 90, 40, 0.45);
+  padding-top: 12px;
+  margin-top: 12px;
+}
+.wdSettings .wdModelEditor .expander {
+  border-radius: 1px;
+  border-color: rgba(120, 90, 40, 0.48);
+}
+
+/* ---------- Bottom In-Game Options Footer Bar ---------- */
+.wdFooterBar {
+  grid-column: 1 / -1;
+  grid-row: 3;
+  position: relative;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 24px;
+  background: linear-gradient(180deg, #07131d 0%, #03090f 100%);
+  border-top: 1px solid var(--lol-gold-5);
+  box-shadow: inset 0 1px 0 rgba(200, 170, 110, 0.2);
+}
+.wdFooterStatus {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.wdFooterDot {
+  width: 7px;
+  height: 7px;
+  flex: none;
+  transform: rotate(45deg);
+  background: var(--lol-teal);
+  box-shadow: 0 0 8px var(--lol-teal);
+}
+.wdFooterDot.off { background: var(--lol-grey-2); box-shadow: none; }
+.wdFooterDot.failed,
+.wdFooterDot.err { background: var(--lol-red); box-shadow: 0 0 8px var(--lol-red); }
+.wdFooterMsg {
+  font-size: 12px;
+  color: var(--lol-gold-2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.wdFooterActions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.wdFooterActions .fui-Button {
+  min-width: 104px;
+  height: 32px;
+}
