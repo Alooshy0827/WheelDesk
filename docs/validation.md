@@ -1,6 +1,6 @@
 # Validation / 验证记录
 
-Version: 0.1.10 internal beta. Host: Apple Silicon, macOS 26.6. Target: macOS 13+ Apple Silicon. Windows installer is deferred by request.
+Version: 0.1.11 internal beta. Host: Apple Silicon, macOS 26.6. Target: macOS 13+ Apple Silicon. Windows installer is deferred by request.
 
 ## Automated checks
 
@@ -82,3 +82,7 @@ This is an internal beta, not a claim that every item in the original two-platfo
 - Live provider requests with user credentials, Windows physical input and mixed-display hardware remain outside this test run.
 
 - The 0.1.10 DMG passed checksum and pinned-signature verification. Backed up 0.1.9 and atomically replaced the canonical app; existing user settings were retained. Installed UI shows 0.1.10, Option trigger and the running input helper without a new authorization. Generated app copies were removed; Launch Services contains only `/Applications/WheelDesk.app`. Native event sequencing above was validated with the simulator; the UI screenshot does not establish physical hold timing.
+
+## WheelDesk icon (0.1.11)
+
+The 1024 px application icon and the 128 px settings asset use the revised first design. The Windows ICO includes seven sizes from 16 to 256 px. Checked the bundled renderer image and its 32 px rendering. Typecheck, native helper tests, production build and JS regression suite passed (2,174 tests passed, five skipped).

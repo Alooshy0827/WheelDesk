@@ -1,6 +1,6 @@
 # WheelDesk
 
-[简体中文](README.zh-CN.md) · Internal beta 0.1.10
+[简体中文](README.zh-CN.md) · Internal beta 0.1.11
 
 A desktop action wheel for everyday tools, AI instructions, and local workflows. Hold Alt (Option on macOS) and press the left mouse button to show the wheel immediately. Move to an action and release the mouse button. Move back into the center, press Escape, or right-click to cancel.
 

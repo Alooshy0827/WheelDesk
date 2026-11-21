@@ -13,15 +13,13 @@ import { DraftInput } from '../settings/components/mateFields';
 import { TextContext } from '../settings/text';
 import { macDarkTheme, macLightTheme } from '../settings/macTheme';
 import { barFrames } from '../settings/navIndicator';
-import { icons } from './Wheel';
 import { ALL_PINGS, DEFAULT_WHEEL, FALLBACK_TEXTURE, textureUrl } from '../../shared/pings';
 import '../settings/settings.css';
 import '../settings/mac.css';
 import './settings-additions.css';
 
 const uid = () => crypto.randomUUID();
-const iconUrl = (kind: string) => 'data:image/svg+xml,' + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48"><rect x="3" y="3" width="42" height="42" rx="11" fill="#1269cb"/><g transform="translate(12 12)" fill="none" stroke="#fff" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="${icons[kind] ?? 'M6 12h12'}"/></g></svg>`);
-const logo = iconUrl('switchWheel');
+const logo = '../wheeldesk-icon.png';
 const sectionIds = ['trigger', 'wheels', 'actions', 'workflows', 'models', 'general'] as const;
 type Section = typeof sectionIds[number];
 function Choice({ value, options, onChange, label, disabled }: { disabled?: boolean; value: string; options: { id: string; name: string }[]; onChange(value: string): void; label: string }) {
