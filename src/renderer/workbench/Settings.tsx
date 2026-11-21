@@ -287,7 +287,7 @@ export function SettingsApp() {
           }}/></EditField>
           {profile.provider === 'custom' && <EditField label={t.baseUrl} hint={t.customUrlHint}><Input aria-label={t.baseUrl} placeholder="https://…/v1" value={profile.baseUrl} onChange={(_, d) => patchProfile({ baseUrl: d.value })}/></EditField>}
           <EditField label={'2 · ' + t.key} hint={['ollama', 'lmstudio'].includes(profile.provider) ? t.localKeyHint : t.apiKeyHint}>
-            <Input aria-label={t.key} type={keyVisible ? 'text' : 'password'} autoComplete="new-password" placeholder={state.keyIds.includes(profile.id) ? t.savedKeyPlaceholder : t.keyPlaceholder} value={key}
+            <Input aria-label={t.key} type={keyVisible ? 'text' : 'password'} autoComplete="new-password" placeholder={state.keysUnchecked ? t.uncheckedKey : state.keyIds.includes(profile.id) ? t.savedKeyPlaceholder : t.keyPlaceholder} value={key}
               contentAfter={<Button appearance="transparent" size="small" onClick={() => setKeyVisible(!keyVisible)}>{keyVisible ? t.hideKey : t.showKey}</Button>}
               onChange={(_, d) => { setKey(d.value); modelRevision.current++; setModelStatus(null); setModelIds([]); }}/>
           </EditField>
@@ -308,7 +308,7 @@ export function SettingsApp() {
               {profile.provider !== 'custom' && <EditField label={t.baseUrl} hint={t.endpointKeyHint}><Input aria-label={t.baseUrl} value={profile.baseUrl} onChange={(_, d) => patchProfile({ baseUrl: d.value })}/></EditField>}
               <EditField label={t.protocol} hint={t.protocolHint}><Choice label={t.protocol} value={profile.protocol} options={[{ id: 'openai', name: t.openaiFormat }, { id: 'anthropic', name: t.anthropicFormat }]} onChange={protocol => patchProfile({ protocol: protocol as 'openai' | 'anthropic' })}/></EditField>
               <div className="wdButtons"><Button disabled={pending || !key.trim()} onClick={() => void modelRequest('key')}>{t.saveKeyOnly}</Button>
-                <Button disabled={pending || !state.keyIds.includes(profile.id)} onClick={() => { if (window.confirm(t.clearKeyConfirm)) void modelRequest('clearKey'); }}>{t.clearKey}</Button></div>
+                <Button disabled={pending || (!state.keysUnchecked && !state.keyIds.includes(profile.id))} onClick={() => { if (window.confirm(t.clearKeyConfirm)) void modelRequest('clearKey'); }}>{t.clearKey}</Button></div>
             </div>
           </ExpanderRow>
         </fieldset></div> : <div className="card notes"><div className="lbl">{t.noModels}</div><Button appearance="primary" onClick={() => { const id = uid(); edit({ profiles: [{ id, name: 'OpenAI', kind: 'builtin', provider: 'openai', protocol: 'openai', baseUrl: 'https://api.openai.com/v1', model: '', tagColor: 3, tagColorCustom: null }], defaultProfileId: id }); setProfileId(id); }}>{t.newModel}</Button></div>}

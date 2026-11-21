@@ -1,6 +1,6 @@
 # WheelDesk
 
-[English](README.md) · 0.1.11 内测版
+[English](README.md) · 0.1.12 内测版
 
 用轮盘执行日常系统操作、AI 指令和本地工作流。按住 Alt（macOS 上为 Option）并按下鼠标左键，轮盘立即显示；移向动作后松开左键执行；回到中心、按 Esc 或右键取消。
 

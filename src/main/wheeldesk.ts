@@ -12,7 +12,7 @@ import { normalizeSettings, type Settings } from '../shared/settings';
 import { hasPreparedInstruction, normalizeWorkbench, parseShortcut, type ActionDefinition, type ActionValue, type InputSource } from '../shared/actions';
 import { DESK_CH, type DeskReply, type DeskState, type Point } from '../shared/ipc';
 import { ContextClient } from './teammate/contextClient';
-import { SecretStore } from './teammate/secrets';
+import { DeskCredentials } from './workbench/credentials';
 import { createAdapter } from './teammate/providers';
 import { ProviderError, type Part } from './teammate/providers/types';
 import { ActionRunner, type ExecutionContext, type RunTarget } from './workbench/runner';
@@ -40,7 +40,7 @@ let store: SettingsStore;
 let bridge: InputBridge;
 let permissionRecovery: PermissionRecovery | undefined;
 let context: ContextClient;
-let secrets: SecretStore;
+let secrets: DeskCredentials;
 let surfaces: DesktopSurfaces;
 let runner: ActionRunner;
 let target: RunTarget = { window: '', selection: '', x: 0, y: 0 };
@@ -57,7 +57,7 @@ const label = (a: { name: string; nameEn?: string }) => language() === 'en' ? a.
 function state(): DeskState {
   return { settings: store.get(), lang: language(), platform, helper: bridge.status,
     run: requestedInput ? { ...runner.state, status: 'input' } : runner.state,
-    keyIds: store.get().workbench.profiles.filter(p => secrets.hasKey(p.id)).map(p => p.id) };
+    ...secrets.status() };
 }
 function broadcast(): void {
   for (const w of [settingsWindow, resultWindow]) if (w && !w.isDestroyed()) w.webContents.send(DESK_CH.state, state());
@@ -416,7 +416,7 @@ void app.whenReady().then(async () => {
   store.load();
   bridge = new InputBridge({ command: helperPath('hook-helper') });
   context = new ContextClient({ command: helperPath('context-helper') });
-  secrets = new SecretStore(join(store.dir, 'secrets.enc'), safeStorage);
+  secrets = new DeskCredentials(join(store.dir, 'secrets.enc'), () => safeStorage);
   runner = new ActionRunner({ input, execute, publish: run => {
     if (run.error) runner.state.error = deskError(run.error, language());
     broadcast();

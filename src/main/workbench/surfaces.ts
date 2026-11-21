@@ -1,3 +1,4 @@
+import { DESK_PARTITION } from './protocol';
 import { BrowserWindow, screen, type Display } from 'electron';
 import { join } from 'node:path';
 import { DESK_CH, type DeskOverlay, type DeskState, type Point } from '../../shared/ipc';
@@ -15,7 +16,7 @@ export function loadDesk(win: BrowserWindow, role: SurfaceRole): Promise<void> {
 }
 export function deskWindow(options: Electron.BrowserWindowConstructorOptions): BrowserWindow {
   const win = new BrowserWindow({ backgroundColor: '#f6f7f9', show: false, autoHideMenuBar: true, ...options,
-    webPreferences: { preload: join(__dirname, '../preload/workbench.js'), sandbox: true, contextIsolation: true,
+    webPreferences: { partition: DESK_PARTITION, preload: join(__dirname, '../preload/workbench.js'), sandbox: true, contextIsolation: true,
       nodeIntegration: false, autoplayPolicy: 'no-user-gesture-required' },
   });
   win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));

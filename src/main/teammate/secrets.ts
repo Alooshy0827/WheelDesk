@@ -54,9 +54,12 @@ export class SecretStore {
     private readonly file: string,
     private readonly crypto: Crypto,
     private readonly now: () => number = Date.now,
+    private readonly requireReadable = false,
   ) {
     this.load();
   }
+
+  storedKeyIds(): string[] { return Object.keys(this.data.keys); }
 
   available(): boolean {
     return this.crypto.isEncryptionAvailable();
@@ -98,13 +101,18 @@ export class SecretStore {
   private load(): void {
     // A missing file means nothing is stored yet. One that can't be decrypted (a keychain prompt the user denied) or
     // parsed reads as empty, but is kept: see keepUnreadable.
-    if (!existsSync(this.file) || !this.available()) return;
+    if (!existsSync(this.file)) return;
+    if (!this.available()) {
+      if (this.requireReadable) throw new SecretsUnavailableError();
+      return;
+    }
     try {
       this.data = parse(this.crypto.decryptString(readFileSync(this.file)));
       this.unread = false;
     } catch {
       this.data = EMPTY();
       this.unread = true;
+      if (this.requireReadable) throw new SecretsUnavailableError();
     }
   }
 

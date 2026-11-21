@@ -1,7 +1,7 @@
 {
   "name": "wheeldesk",
   "productName": "WheelDesk",
-  "version": "0.1.11",
+  "version": "0.1.12",
   "private": true,
   "description": "Configurable desktop action wheels and AI workflows",
   "author": "WheelDesk contributors; based on lolPing by Danrui Meng",

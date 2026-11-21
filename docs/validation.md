@@ -1,6 +1,6 @@
 # Validation / 验证记录
 
-Version: 0.1.11 internal beta. Host: Apple Silicon, macOS 26.6. Target: macOS 13+ Apple Silicon. Windows installer is deferred by request.
+Version: 0.1.12 internal beta. Host: Apple Silicon, macOS 26.6. Target: macOS 13+ Apple Silicon. Windows installer is deferred by request.
 
 ## Automated checks
 
@@ -86,3 +86,7 @@ This is an internal beta, not a claim that every item in the original two-platfo
 ## WheelDesk icon (0.1.11)
 
 The 1024 px application icon and the 128 px settings asset use the revised first design. The Windows ICO includes seven sizes from 16 to 256 px. Checked the bundled renderer image and its 32 px rendering. Typecheck, native helper tests, production build and JS regression suite passed (2,174 tests passed, five skipped).
+
+## Keychain access on startup (0.1.12)
+
+Validated with existing credential-file fixtures. Settings, overlay startup and state queries made zero calls to the Electron safeStorage API in an instrumented Electron process. The renderer session is in-memory. A denied decrypt preserved the original bytes, and a later explicit read recovered the original key. Typecheck, production build, 1,282 native assertions and 2,176 JavaScript tests passed (five skipped). These checks do not change or test the user's login keychain ACL.

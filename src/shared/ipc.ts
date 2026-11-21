@@ -340,6 +340,7 @@ export interface DeskState {
   helper: HelperStatus;
   run: import('./actions').RunState;
   keyIds: string[];
+  keysUnchecked?: boolean;
 }
 export type DeskCommand =
   | { type: 'state' }

@@ -4,7 +4,7 @@ import { pathToFileURL } from 'node:url';
 import { registerDeskScheme, serveDeskScheme } from '../../src/main/workbench/protocol';
 
 const h = vi.hoisted(() => ({ register: vi.fn(), handle: vi.fn(), fetch: vi.fn() }));
-vi.mock('electron', () => ({ protocol: { registerSchemesAsPrivileged: h.register, handle: h.handle }, net: { fetch: h.fetch } }));
+vi.mock('electron', () => ({ protocol: { registerSchemesAsPrivileged: h.register }, session: { fromPartition: () => ({ protocol: { handle: h.handle }, fetch: h.fetch }) } }));
 beforeEach(() => { vi.clearAllMocks(); });
 it('registers a secure fetch-capable local origin for the original audio loader', () => {
   registerDeskScheme();
