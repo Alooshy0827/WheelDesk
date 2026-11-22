@@ -12,7 +12,7 @@ WheelDesk is an independent fork of lolPing at c97fe772b98514b83f011ee540601faab
 
 ## Invariants
 
-The settings UI must retain the upstream lolPing layout and components. Extend its Fluent controls, original platform CSS, grouped rows, scrolling sidebar and wheel editor; do not replace it with a separately designed dashboard.
+The settings and result UI use WheelDesk's 1:1 League of Legends in-game ESC options design system (`docs/ui-design-spec.md`). Read `docs/ui-design-spec.md` before changing renderer styles, components, fonts, or window chrome. Keep upstream Fluent controls, scrolling six-section navigation, wheel editor behavior, and `tools/smoke.cjs` DOM contracts intact; override `mac.css` through `league-settings.css` and `leagueTheme.ts` rather than deleting upstream files. Do not add decorative slogans or non-functional subheadings.
 
 Ordinary input always passes through unchanged; paused input swallows nothing. A gesture dispatches exactly once from the main process. Preserve multi-monitor coordinate conventions. New settings need normalization/defaults. IPC input is unknown until checked; renderers cannot execute arbitrary commands. Keys are encrypted and never logged or returned to a renderer. A text-only AI action never captures the screen. No model decides which system actions execute.
 
