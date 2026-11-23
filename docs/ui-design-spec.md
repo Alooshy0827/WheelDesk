@@ -161,20 +161,20 @@ WheelDesk uses **Plan A** (1:1 China-server in-game ESC menu typography — bold
 
 ## 9. UI Interaction Audio (`src/renderer/workbench/uiSounds.ts` & `assets/ui-sounds/`)
 
-WheelDesk pairs its 1:1 LOL visual UI with 10 authentic `rcp-fe-lol-uikit` OGG Vorbis interaction sound effects decoded via `SoundBank` (Web Audio API, offline from `../ui-sounds/*.ogg`, synced to global `volume` & `muted` settings):
+WheelDesk pairs its 1:1 LOL visual UI with 10 authentic `rcp-fe-lol-uikit` Opus-in-OGG interaction sound effects decoded via `SoundBank` (Web Audio API, offline from `../ui-sounds/*.ogg`, synced to global `volume` & `muted` settings). Because Riot's raw client UIKit OGGs span `-40 dBFS` to `-11 dBFS` (much quieter than `0 dBFS` in-game pings), each asset is peak-mastered by interaction tier so desktop UI feedback stays balanced and clearly audible without ever overpowering pings:
 
-| Interaction | Sound ID | File | Notes |
+| Interaction | Sound ID | File | Mastered Peak / Gain |
 | --- | --- | --- | --- |
-| Sidebar category switch (`.navItem`) | `nav` | `sfx-nav-button-text-click.ogg` | Gain `0.65` |
-| Standard button / Expander header | `click` | `sfx-uikit-click-generic.ogg` | Gain `0.72` |
-| Primary Hextech confirm (`.wdBtnPrimary`, `button.primary`) | `confirm` | `sfx-uikit-button-gold-click.ogg` | Gain `0.75` |
-| Square checkbox toggle (`.fui-Switch__input`) | `checkbox` | `sfx-uikit-checkbox-click.ogg` | Gain `0.80` |
-| Dropdown / Combobox open | `dropdownOpen` | `sfx-uikit-dropdown-click.ogg` | Gain `0.70` |
-| Dropdown / Combobox option select | `dropdownSelect` | `sfx-uikit-dropdown-select.ogg` | Gain `0.75` (portal delegated) |
-| Hover tick / Slider drag tick | `hover` | `sfx-uikit-grid-hover.ogg` | `0.06s`, gain `0.40`, throttled `70ms` |
-| Wheel slot click / drop (`.weSlot`) | `slot` | `sfx-uikit-framed-icon-click.ogg` | Gain `0.70` (skip `.weTile` click to avoid layering over ping preview) |
-| Delete / Cancel / Close (`[data-sfx="cancel"]`, `.icon-button`) | `cancel` | `sfx-uikit-button-circlex-click.ogg` | Gain `0.75` |
-| Model test OK / AI understanding ready / Result completed | `success` | `sfx-uikit-reward-toast.ogg` | Gain `0.65` |
+| Sidebar category switch (`.navItem`) | `nav` | `sfx-nav-button-text-click.ogg` | `-9 dBFS` / gain `0.78` |
+| Standard button / Expander header | `click` | `sfx-uikit-click-generic.ogg` | `-9 dBFS` / gain `0.80` |
+| Primary Hextech confirm (`.wdBtnPrimary`, `button.primary`) | `confirm` | `sfx-uikit-button-gold-click.ogg` | `-6 dBFS` / gain `0.88` |
+| Square checkbox toggle (`.fui-Switch__input`) | `checkbox` | `sfx-uikit-checkbox-click.ogg` | `-8 dBFS` / gain `0.85` |
+| Dropdown / Combobox open | `dropdownOpen` | `sfx-uikit-dropdown-click.ogg` | `-10 dBFS` / gain `0.78` |
+| Dropdown / Combobox option select | `dropdownSelect` | `sfx-uikit-dropdown-select.ogg` | `-8 dBFS` / gain `0.82` (portal delegated) |
+| Hover tick / Slider drag tick | `hover` | `sfx-uikit-grid-hover.ogg` | `-14 dBFS` / gain `0.60` (`0.06s`, throttled `85ms`) |
+| Wheel slot click / drop (`.weSlot`) | `slot` | `sfx-uikit-framed-icon-click.ogg` | `-8 dBFS` / gain `0.82` (skip `.weTile` click to avoid layering over ping preview) |
+| Delete / Cancel / Close (`[data-sfx="cancel"]`, `.icon-button`) | `cancel` | `sfx-uikit-button-circlex-click.ogg` | `-9 dBFS` / gain `0.80` |
+| Model test OK / AI understanding ready / Result completed | `success` | `sfx-uikit-reward-toast.ogg` | `-7 dBFS` / gain `0.80` |
 
 Keep `assets/sounds/` strictly limited to the 12 original ping `.wav` files required by `tools/smoke.cjs`; all UI interaction audio lives under `assets/ui-sounds/`.
 

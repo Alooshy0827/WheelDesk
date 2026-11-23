@@ -18,20 +18,21 @@ interface UiSoundSpec {
   gain: number;
 }
 
+// Each OGG asset is peak-mastered by interaction tier (-14 dB hover to -6 dB confirm vs 0 dB pings).
 const UI_SOUNDS: Record<UiSoundId, UiSoundSpec> = {
-  nav: { file: 'sfx-nav-button-text-click.ogg', gain: 0.65 },
-  click: { file: 'sfx-uikit-click-generic.ogg', gain: 0.72 },
-  confirm: { file: 'sfx-uikit-button-gold-click.ogg', gain: 0.75 },
-  checkbox: { file: 'sfx-uikit-checkbox-click.ogg', gain: 0.8 },
-  dropdownOpen: { file: 'sfx-uikit-dropdown-click.ogg', gain: 0.7 },
-  dropdownSelect: { file: 'sfx-uikit-dropdown-select.ogg', gain: 0.75 },
-  hover: { file: 'sfx-uikit-grid-hover.ogg', gain: 0.4 },
-  slot: { file: 'sfx-uikit-framed-icon-click.ogg', gain: 0.7 },
-  cancel: { file: 'sfx-uikit-button-circlex-click.ogg', gain: 0.75 },
-  success: { file: 'sfx-uikit-reward-toast.ogg', gain: 0.65 },
+  nav: { file: 'sfx-nav-button-text-click.ogg', gain: 0.78 },
+  click: { file: 'sfx-uikit-click-generic.ogg', gain: 0.8 },
+  confirm: { file: 'sfx-uikit-button-gold-click.ogg', gain: 0.88 },
+  checkbox: { file: 'sfx-uikit-checkbox-click.ogg', gain: 0.85 },
+  dropdownOpen: { file: 'sfx-uikit-dropdown-click.ogg', gain: 0.78 },
+  dropdownSelect: { file: 'sfx-uikit-dropdown-select.ogg', gain: 0.82 },
+  hover: { file: 'sfx-uikit-grid-hover.ogg', gain: 0.6 },
+  slot: { file: 'sfx-uikit-framed-icon-click.ogg', gain: 0.82 },
+  cancel: { file: 'sfx-uikit-button-circlex-click.ogg', gain: 0.8 },
+  success: { file: 'sfx-uikit-reward-toast.ogg', gain: 0.8 },
 };
 
-const HOVER_THROTTLE_MS = 70;
+const HOVER_THROTTLE_MS = 85;
 
 let bank: SoundBank | null = null;
 let loadPromise: Promise<string[]> | null = null;
