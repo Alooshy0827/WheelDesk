@@ -5,7 +5,7 @@ import { defaultWorkbench, newAction, type ActionKind } from '../../../src/share
 
 describe('action result visibility', () => {
   const target = { window: '', selection: '', x: 0, y: 0 };
-  it.each<ActionKind>(['shortcut', 'openApp', 'openPath', 'openUrl', 'writeClipboard', 'pasteText', 'switchWheel', 'delay'])(
+  it.each<ActionKind>(['shortcut', 'openPath', 'openUrl', 'writeClipboard', 'pasteText', 'switchWheel', 'delay'])(
     'does not request a result window for %s, even when data is returned', async kind => {
       const settings = defaultWorkbench(); settings.actions.push(newAction('test', kind));
       const visible: boolean[] = [];
@@ -26,7 +26,7 @@ describe('action result visibility', () => {
   it('shows failures of silent actions and allows workflow progress without a completion popup', async () => {
     const settings = defaultWorkbench();
     settings.actions.push({ ...newAction('flow', 'workflow'), value: 'f' });
-    settings.workflows.push({ id: 'f', name: '', steps: [{ id: 's', actionId: 'copy', input: 'none' }] });
+    settings.workflows.push({ id: 'f', name: '', steps: [{ id: 's', actionId: 'downloads', input: 'none' }] });
     const visible: boolean[] = [];
     let fail = false;
     const runner = new ActionRunner({ input: async () => ({}), execute: async () => {
@@ -35,7 +35,7 @@ describe('action result visibility', () => {
     await runner.run('flow', settings, target);
     expect(visible[0]).toBe(true); expect(visible.at(-1)).toBe(false);
     fail = true; visible.length = 0;
-    await runner.run('copy', settings, target);
+    await runner.run('downloads', settings, target);
     expect(visible[0]).toBe(false); expect(visible.at(-1)).toBe(true);
   });
 });

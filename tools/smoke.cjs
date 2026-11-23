@@ -1,5 +1,5 @@
 // Runs the real application against an isolated data directory and a local model fixture.
-const { app, BrowserWindow, nativeTheme, screen } = require('electron');
+const { app, BrowserWindow, nativeTheme, screen, shell } = require('electron');
 nativeTheme.themeSource = 'light';
 const { join } = require('node:path');
 const { mkdirSync, writeFileSync, readdirSync } = require('node:fs');
@@ -68,13 +68,16 @@ app.whenReady().then(async () => {
   await win.webContents.executeJavaScript(`document.querySelector('[data-section="wheels"]').click()`);
   await pause(600);
   assert.equal(await win.webContents.executeJavaScript('document.querySelectorAll(".weTile").length'), 12);
+  assert(await win.webContents.executeJavaScript(`[...document.querySelectorAll('.weTile')].every(tile =>
+    tile.getAttribute('aria-label') && tile.innerText.trim() === (tile.querySelector('.weWhere')?.innerText ?? ''))`));
+  assert(await win.webContents.executeJavaScript(`document.querySelector('#actions + .card .desc').innerText.includes('创建动作')`));
   assert.equal(await win.webContents.executeJavaScript('document.querySelectorAll(".wdBinding").length'), 8);
   await win.webContents.executeJavaScript(`document.querySelectorAll('.weSlot')[0].click()`);
   await pause(50);
   await win.webContents.executeJavaScript(`document.querySelectorAll('.weSlot')[3].click()`);
   await until(async () => {
     const wheel = (await invoke({type:'state'})).state.settings.workbench.wheels[0];
-    return wheel.effects[3] === 'danger' && wheel.effects[0] === 'allin' && wheel.slots[3] === 'copy' && wheel.slots[0] === 'undo';
+    return wheel.effects[3] === 'danger' && wheel.effects[0] === 'allin' && wheel.slots[3] === 'capture' && wheel.slots[0] === 'plainPaste';
   }, 'wheel editor moves effects together with functions and autosaves');
   await win.webContents.executeJavaScript(`document.querySelector('.wdBinding [role="combobox"]').click()`);
   await until(() => win.webContents.executeJavaScript('Boolean(document.querySelector("[role=option]"))'), 'function choices');
@@ -103,8 +106,8 @@ app.whenReady().then(async () => {
   await chooseCount(12);
   await win.webContents.executeJavaScript(`document.querySelectorAll('.wdBinding [role="combobox"]')[11].click()`);
   await until(() => win.webContents.executeJavaScript('Boolean(document.querySelector("[role=option]"))'), 'new spoke binding options');
-  await win.webContents.executeJavaScript(`[...document.querySelectorAll('[role="option"]')].find(o => o.textContent === '复制').click()`);
-  await until(async () => (await invoke({type:'state'})).state.settings.workbench.wheels[0].slots[11] === 'copy', 'save twelfth binding');
+  await win.webContents.executeJavaScript(`[...document.querySelectorAll('[role="option"]')].find(o => o.textContent === '区域截图').click()`);
+  await until(async () => (await invoke({type:'state'})).state.settings.workbench.wheels[0].slots[11] === 'capture', 'save twelfth binding');
   await setSlotName(11, '第十二个位置');
   await chooseCount(3);
   await new Promise(resolve => { win.webContents.once('did-finish-load', resolve); win.webContents.reload(); });
@@ -116,7 +119,7 @@ app.whenReady().then(async () => {
     if (count === 6 || count === 12) writeFileSync(join(smokeDir, `wheel-editor-${count}.png`), (await win.webContents.capturePage()).toPNG());
   }
   const counted = (await invoke({type:'state'})).state.settings.workbench;
-  assert.equal(counted.wheels[0].slots[11], 'copy');
+  assert.equal(counted.wheels[0].slots[11], 'capture');
   assert.equal(counted.wheels[0].slotNames[11], '第十二个位置');
   assert.deepEqual(counted.wheels[0].slots.slice(0, 8), settings.workbench.wheels[0].slots);
   assert.equal(counted.wheels[1].slotCount, 8);
@@ -170,7 +173,7 @@ app.whenReady().then(async () => {
   assert.equal(await overlayJS(`[...document.querySelectorAll('#wheel path')].filter(p => p.getAttribute('fill') === 'url(#lp-wheel-ext)').length`), 4);
   assert.equal(await overlayJS('getComputedStyle(document.querySelector("#wheel")).transitionDuration'), '0.12s, 0.12s');
   sendOverlay({type:'move',x:360,y:190});
-  await until(() => overlayJS('document.querySelector("#wheel .centerTxt").textContent === "复制"'), 'custom function label on original wheel');
+  await until(() => overlayJS('document.querySelector("#wheel .centerTxt").textContent === "区域截图"'), 'custom function label on original wheel');
   await until(() => overlayJS('getComputedStyle(document.querySelector("#wheel .icon.hot")).transform === "matrix(1.18, 0, 0, 1.18, 0, 0)"'), 'original 1.18x hover scale', 3000);
   writeFileSync(join(smokeDir,'original-wheel.png'), (await overlay.webContents.capturePage({x:0,y:0,width:720,height:660})).toPNG());
   sendOverlay({type:'move',x:360,y:330});
@@ -213,6 +216,24 @@ app.whenReady().then(async () => {
       const physical = process.platform === 'darwin' ? point : screen.dipToScreenPoint(point);
       simulatedHook.stdin.write(JSON.stringify({type:'sim',ev,...physical,t:simTime += 20,...extra}) + '\n');
     };
+    const presetSelector = '[role="combobox"][aria-label="轮盘预设"]';
+    async function choosePreset(preset) {
+      await win.webContents.executeJavaScript(`document.querySelector('${presetSelector}').click()`);
+      await until(() => win.webContents.executeJavaScript(`[...document.querySelectorAll('[role="option"]')].some(o => o.textContent === ${JSON.stringify(preset.name)})`), 'preset options');
+      await win.webContents.executeJavaScript(`[...document.querySelectorAll('[role="option"]')].find(o => o.textContent === ${JSON.stringify(preset.name)}).click()`);
+      await until(async () => (await invoke({type:'state'})).state.settings.workbench.activeWheelId === preset.id, 'dropdown activates preset');
+    }
+    const [toolsWheel, aiWheel] = emptySettings.workbench.wheels;
+    await choosePreset(aiWheel);
+    sim('kdown',360,330,{vk:164}); sim('mdown',360,330,{btn:'left'});
+    await until(() => overlayJS(`document.querySelector('#wheel').classList.contains('open') && document.querySelector('#wheel .centerTxt').textContent === ${JSON.stringify(aiWheel.name)}`), 'gesture opens selected preset');
+    sim('mup',360,330,{btn:'left'}); sim('kup',360,330,{vk:164});
+    await until(() => overlayJS('!document.querySelector("#wheel").classList.contains("open")'), 'cancel at center');
+    const saved = await invoke({type:'save', settings:emptySettings, preserveActiveWheel:true});
+    assert.equal(saved.state.settings.workbench.activeWheelId, aiWheel.id);
+    await new Promise(resolve => { win.webContents.once('did-finish-load', resolve); win.webContents.reload(); });
+    await until(() => win.webContents.executeJavaScript(`document.querySelector('${presetSelector}')?.textContent.includes(${JSON.stringify(aiWheel.name)})`), 'editor reopens on active preset');
+    await choosePreset(toolsWheel);
     sim('kdown',360,330,{vk:164}); sim('mdown',360,330,{btn:'left'});
     await until(() => overlayJS('document.querySelector("#wheel").classList.contains("open")'), 'wheel opens on press before any mouse movement');
     sim('move',360,180);
@@ -230,6 +251,50 @@ app.whenReady().then(async () => {
     sendOverlay({type:'close',clear:true});
     await setSlotName(0, '');
     assert.equal((await invoke({type:'state'})).state.settings.workbench.wheels[0].slotNames[0], '');
+    await win.webContents.executeJavaScript(`document.querySelector('button[aria-label="新工作流"]').click()`);
+    await win.webContents.executeJavaScript(`[...document.querySelectorAll('button')].find(b => b.textContent === '添加步骤').click()`);
+    const selectOption = async (selector, label) => {
+      await win.webContents.executeJavaScript(`document.querySelector(${JSON.stringify(selector)}).click()`);
+      const option = `[...document.querySelectorAll('[role="option"]')].find(o => o.textContent === ${JSON.stringify(label)})`;
+      await until(() => win.webContents.executeJavaScript(`Boolean(${option})`), label);
+      await win.webContents.executeJavaScript(`${option}.click()`);
+    };
+    await selectOption('.mateRule [role="combobox"]', aiWheel.name);
+    await selectOption('.wdBinding [role="combobox"]', '工作流 · 新工作流');
+    const bound = await until(async () => {
+      const wb = (await invoke({type:'state'})).state.settings.workbench;
+      return wb.workflows.length === 1 && wb.wheels[0].slots[0] === 'workflow:' + wb.workflows[0].id && wb;
+    }, 'direct workflow binding autosaves');
+    assert(!bound.actions.some(a => a.kind === 'workflow'));
+    sim('kdown',360,330,{vk:164}); sim('mdown',360,330,{btn:'left'});
+    await until(() => overlayJS('document.querySelector("#wheel").classList.contains("open")'), 'open wheel with bound workflow');
+    sim('move',360,180);
+    await until(() => overlayJS('document.querySelector("#wheel .centerTxt").textContent === "新工作流"'), 'workflow name on wheel');
+    sim('mup',360,180,{btn:'left'}); sim('kup',360,180,{vk:164});
+    await until(async () => {
+      const s = (await invoke({type:'state'})).state;
+      return s.run.name === '新工作流' && s.run.status === 'completed' && s.settings.workbench.activeWheelId === aiWheel.id;
+    }, 'wheel runs workflow steps without a proxy');
+    // Exercise legacy wheel bindings through the native simulator. Intercept only the OS launch.
+    const legacy = structuredClone(settings);
+    const launch = { ...legacy.workbench.actions.find(a => a.id === 'downloads'), id: 'legacy-editor',
+      name: '旧应用', kind: 'openApp', mac: '/Applications/Fixture.app', windows: 'C:/Fixture.exe' };
+    legacy.workbench.actions.push(launch);
+    legacy.workbench.wheels[0].slots[0] = launch.id;
+    legacy.workbench.wheels[0].slotNames[0] = '';
+    assert.equal((await invoke({type:'save',settings:legacy})).ok,true);
+    const openedPaths = [];
+    const openPath = shell.openPath;
+    shell.openPath = async path => { openedPaths.push(path); return ''; };
+    try {
+      sim('kdown',360,330,{vk:164}); sim('mdown',360,330,{btn:'left'});
+      await until(() => overlayJS('document.querySelector("#wheel").classList.contains("open")'), 'open migrated wheel');
+      sim('move',360,180);
+      await until(() => overlayJS('document.querySelector("#wheel .centerTxt").textContent === "旧应用"'), 'legacy launch binding retains its label');
+      sim('mup',360,180,{btn:'left'}); sim('kup',360,180,{vk:164});
+      await until(() => openedPaths.length > 0, 'legacy slot dispatches system open');
+      assert.deepEqual(openedPaths, [process.platform === 'darwin' ? launch.mac : launch.windows]);
+    } finally { shell.openPath = openPath; }
     assert.equal((await invoke({type:'save',settings})).ok,true);
   }
 
@@ -431,11 +496,12 @@ app.whenReady().then(async () => {
   await until(() => win.webContents.executeJavaScript('!document.querySelector(".content").inert'), 'cancel preparation');
   assert.deepEqual(await customState(), beforeFailure);
   stallPreparation = false;
+  win.show(); win.focus();
   await win.webContents.executeJavaScript(`document.querySelector('textarea[aria-label="动作描述"]').scrollIntoView({block:'start',behavior:'instant'})`);
   writeFileSync(join(smokeDir, 'custom-ai.png'), (await win.webContents.capturePage()).toPNG());
   assert.deepEqual(errors, []);
   writeFileSync(join(smokeDir, 'report.json'), JSON.stringify({ passed: true, simulatedGestures: Boolean(simulatedHook), helper: finished.helper,
-    checks: ['wheel opens on press before movement', 'create and bind custom AI through UI', 'prepare/cache/edit/regenerate AI instructions', 'description change prepares once', 'cancel or failed interpretation preserves previous instruction', 'AI interpretation sender validation', 'eight provider presets and persistence', 'real model test and localized auth error', 'save-and-test persists successful keys with mock keychain', 'failed replacement preserves saved key', 'advanced settings collapsed by default', 'model-test sender validation', '2–12 spokes through real settings UI', 'per-wheel spoke count persistence after reload', 'hidden function restoration', 'dynamic overlay hit alignment', 'settings mounts', 'upstream six-section navigation', 'original effect/function pairs move and autosave', 'empty function slots', '12 original effects', 'original collision/ring/bobbing animations', '12 sounds fetched and decoded', 'preview does not execute actions', 'original wheel geometry/hover/transition', 'custom function labels', 'idle overlay cleanup', 'light and dark themes', 'Chinese language', 'independent branding', 'model listing', 'text-only AI request', 'no AI tools', 'streamed result', 'usage', 'renderer IPC permissions', 'real script action', 'custom slot names persist across reload and resizing', 'custom names appear as text in wheel and effect', 'ordinary actions never show result window', 'failure and manual input still show', 'cancellation stays hidden'], rendererErrors: errors }, null, 2));
+    checks: ['bind and execute a workflow directly from the wheel', 'preset dropdown immediately switches the gesture wheel and survives reload', 'wheel opens on press before movement', 'create and bind custom AI through UI', 'prepare/cache/edit/regenerate AI instructions', 'description change prepares once', 'cancel or failed interpretation preserves previous instruction', 'AI interpretation sender validation', 'eight provider presets and persistence', 'real model test and localized auth error', 'save-and-test persists successful keys with mock keychain', 'failed replacement preserves saved key', 'advanced settings collapsed by default', 'model-test sender validation', '2–12 spokes through real settings UI', 'per-wheel spoke count persistence after reload', 'hidden function restoration', 'dynamic overlay hit alignment', 'settings mounts', 'upstream six-section navigation', 'original effect/function pairs move and autosave', 'empty function slots', '12 original effects', 'original collision/ring/bobbing animations', '12 sounds fetched and decoded', 'preview does not execute actions', 'original wheel geometry/hover/transition', 'custom function labels', 'idle overlay cleanup', 'light and dark themes', 'Chinese language', 'independent branding', 'model listing', 'text-only AI request', 'no AI tools', 'streamed result', 'usage', 'renderer IPC permissions', 'real script action', 'custom slot names persist across reload and resizing', 'custom names appear as text in wheel and effect', 'ordinary actions never show result window', 'failure and manual input still show', 'cancellation stays hidden'], rendererErrors: errors }, null, 2));
   console.log('WheelDesk smoke passed', JSON.stringify({ helper: finished.helper }));
   server.close(); app.quit();
 }).catch(async error => {

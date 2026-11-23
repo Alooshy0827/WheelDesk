@@ -59,7 +59,7 @@ beforeEach(() => {
 describe('original effects with custom functions', () => {
   it.each([2, 3, 4, 6, 9, 12])('snapshots %i active spokes and ignores a later count change', async count => {
     const wheel = resizeWheel(state.settings.workbench.wheels[0], count);
-    wheel.slots[count - 1] = 'copy';
+    wheel.slots[count - 1] = 'capture';
     state.settings.workbench.wheels[0] = wheel;
     await gesture();
     expect(events().find(e => e.type === 'open')?.effects).toHaveLength(count);
@@ -67,7 +67,7 @@ describe('original effects with custom functions', () => {
     state.settings.workbench.wheels[0] = resizeWheel(wheel, count === 2 ? 12 : 2);
     const rad = (count - 1) * 2 * Math.PI / count;
     release(Math.round(500 + 200 * Math.sin(rad)), Math.round(500 - 200 * Math.cos(rad)));
-    expect(chosen).toHaveBeenCalledExactlyOnceWith('copy', { x: 500, y: 500 });
+    expect(chosen).toHaveBeenCalledExactlyOnceWith('capture', { x: 500, y: 500 });
     expect(effects()[0]?.effect).toBe(wheel.effects[count - 1]);
   });
   it('plays effects on newly added spokes without executing a function', async () => {
@@ -82,8 +82,8 @@ describe('original effects with custom functions', () => {
   it('plays the selected effect and executes its independently bound action exactly once', async () => {
     state.settings.workbench.wheels[0].effects[0] = 'allin';
     await gesture(); release(); release();
-    expect(chosen).toHaveBeenCalledExactlyOnceWith('copy', { x: 500, y: 500 });
-    expect(effects()).toEqual([expect.objectContaining({ effect: 'allin', name: 'Copy', x: 500, y: 500 })]);
+    expect(chosen).toHaveBeenCalledExactlyOnceWith('capture', { x: 500, y: 500 });
+    expect(effects()).toEqual([expect.objectContaining({ effect: 'allin', name: 'Capture region', x: 500, y: 500 })]);
     expect(h.windows[0].visible).toBe(true);
     surfaces.idle(h.windows[0].webContents.id, true);
     expect(h.windows[0].visible).toBe(false);
@@ -91,12 +91,12 @@ describe('original effects with custom functions', () => {
   it('keeps the effect, action, label and scale from this gesture when settings change', async () => {
     await gesture();
     state.settings.workbench.wheels[0].effects[0] = 'allin';
-    state.settings.workbench.wheels[0].slots[0] = 'paste';
+    state.settings.workbench.wheels[0].slots[0] = 'plainPaste';
     state.settings.workbench.activeWheelId = 'ai';
     state.settings.wheelSizePx = 900;
     release(500, 400);
-    expect(chosen).toHaveBeenCalledExactlyOnceWith('copy', { x: 500, y: 500 });
-    expect(effects()[0]).toMatchObject({ effect: 'danger', name: 'Copy', visual: { wheelSizePx: DEFAULT_SETTINGS.wheelSizePx } });
+    expect(chosen).toHaveBeenCalledExactlyOnceWith('capture', { x: 500, y: 500 });
+    expect(effects()[0]).toMatchObject({ effect: 'danger', name: 'Capture region', visual: { wheelSizePx: DEFAULT_SETTINGS.wheelSizePx } });
   });
   it('plays an unbound slot once, but not for cancellation or the center', async () => {
     state.settings.workbench.wheels[0].slots[0] = null;
@@ -114,13 +114,13 @@ describe('original effects with custom functions', () => {
     state.settings.workbench.wheels[0].effects[0] = 'allin';
     await gesture();
     expect(events().find(e => e.type === 'open')?.labels?.[0]).toBe('全力进攻');
-    state.settings.workbench.wheels[0].slots[0] = 'copy';
+    state.settings.workbench.wheels[0].slots[0] = 'capture';
     state.settings.workbench.wheels[0].effects[0] = 'danger';
     release();
     expect(chosen).not.toHaveBeenCalled();
     expect(effects()).toEqual([expect.objectContaining({ effect: 'allin', name: '全力进攻' })]);
   });
-  it.each(['copy', null])('uses the custom name for binding %s and snapshots it for the effect', async binding => {
+  it.each(['capture', null])('uses the custom name for binding %s and snapshots it for the effect', async binding => {
     const wheel = state.settings.workbench.wheels[0];
     wheel.slots[0] = binding;
     wheel.slotNames[0] = 'My <custom> name';
@@ -143,7 +143,7 @@ describe('original effects with custom functions', () => {
     await gesture(2320, 600); release(2320, 300);
     expect(events(1).find(e => e.type === 'open')).toMatchObject({ x: 200, y: 300 });
     expect(effects(1)[0]).toMatchObject({ x: 200, y: 300, effect: 'danger' });
-    expect(chosen).toHaveBeenCalledExactlyOnceWith('copy', { x: 2320, y: 600 });
+    expect(chosen).toHaveBeenCalledExactlyOnceWith('capture', { x: 2320, y: 600 });
     expect(effects(0)).toEqual([]);
   });
   it('previews an original effect without opening or running any action', async () => {

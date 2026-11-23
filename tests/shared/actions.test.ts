@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { defaultWorkbench, newAction, normalizeWorkbench, parseShortcut, resizeWheel, setWheelEffects, validateWorkflow } from '../../src/shared/actions';
+import { defaultWorkbench, newAction, normalizeWorkbench, parseShortcut, resizeWheel, setWheelEffects, slotBindableActions, validateWorkflow } from '../../src/shared/actions';
 import { DEFAULT_WHEEL } from '../../src/shared/pings';
 
 describe('workbench configuration', () => {
@@ -11,6 +11,51 @@ describe('workbench configuration', () => {
       expect(wheel.slots.every(id => settings.actions.some(a => a.id === id))).toBe(true);
     }
     expect(normalizeWorkbench(settings)).toEqual(settings);
+  });
+  it('merges old open types on load without changing IDs, paths or bindings', () => {
+    const wb = defaultWorkbench();
+    const app = { ...newAction('editor', 'openPath'), name: '编辑器', windows: 'C:/Apps/Editor.exe', mac: '/Applications/Editor.app' };
+    const file = { ...newAction('notes', 'openPath'), value: '/shared/notes.txt' };
+    const wheel = resizeWheel(wb.wheels[0], 12);
+    wheel.slots[0] = app.id;
+    wheel.slots[11] = file.id;
+    wheel.slotNames[0] = '写作';
+    wb.wheels[0] = resizeWheel(wheel, 8);
+    wb.workflows.push({ id: 'start', name: 'Begin', steps: [app, file].map(a => ({ id: a.id, actionId: a.id, input: 'none' })) });
+
+    const saved = normalizeWorkbench({ ...wb, actions: [...wb.actions, { ...app, kind: 'openApp' }, file] });
+    expect(saved.actions.slice(-2)).toEqual([app, file]);
+    expect(saved.wheels).toEqual(wb.wheels);
+    expect(saved.workflows).toEqual(wb.workflows);
+    expect(validateWorkflow(saved.workflows[0], saved)).toEqual([]);
+    expect(normalizeWorkbench(saved)).toEqual(saved);
+  });
+  it('migrates visible and hidden legacy workflow bindings independently of action IDs', () => {
+    const s = defaultWorkbench();
+    s.workflows.push({ id: 'capture', name: 'Review', steps: [] });
+    s.actions.push({ ...newAction('old-flow', 'workflow'), value: 'capture' });
+    const wheel = resizeWheel(s.wheels[0], 12);
+    wheel.slots[0] = 'capture'; wheel.slots[1] = 'workflow:capture'; wheel.slots[11] = 'old-flow';
+    wheel.slotNames[11] = 'My shortcut';
+    s.wheels[0] = resizeWheel(wheel, 8);
+    const migrated = normalizeWorkbench(s);
+    expect(migrated.wheels[0].slots[0]).toBe('capture');
+    expect(migrated.wheels[0].slots[1]).toBe('workflow:capture');
+    expect(migrated.wheels[0].slots[11]).toBe('workflow:capture');
+    expect(migrated.wheels[0].slotNames[11]).toBe('My shortcut');
+    expect(normalizeWorkbench(migrated)).toEqual(migrated);
+    expect(normalizeWorkbench({ ...migrated, workflows: [] }).wheels[0].slots[11]).toBeNull();
+  });
+  it('filters workflow-only blocks and self-switches from standalone wheel slot options while keeping existing bindings', () => {
+    const wb = defaultWorkbench();
+    wb.actions.push(newAction('wait', 'delay'), newAction('clip', 'readClipboard'));
+    const toolsOptions = slotBindableActions(wb, 'tools').map(a => a.id);
+    expect(toolsOptions).not.toContain('toTools');
+    expect(toolsOptions).toContain('toAI');
+    expect(toolsOptions).not.toContain('wait');
+    expect(toolsOptions).not.toContain('clip');
+    expect(slotBindableActions(wb, 'tools', 'wait').map(a => a.id)).toContain('wait');
+    expect(slotBindableActions(wb, 'tools', 'toTools').map(a => a.id)).toContain('toTools');
   });
   it('recovers missing settings and repairs references without reviving deleted actions', () => {
     expect(normalizeWorkbench(null)).toEqual(defaultWorkbench());
@@ -103,7 +148,7 @@ describe('workbench configuration', () => {
   it('persists hidden bindings and restores them after shrinking and expanding', () => {
     const wb = defaultWorkbench();
     const original = resizeWheel(wb.wheels[0], 12);
-    original.slots[11] = 'copy';
+    original.slots[11] = 'capture';
     const saved = normalizeWorkbench(JSON.parse(JSON.stringify({ ...wb, wheels: [resizeWheel(original, 3)] })));
     expect(saved.wheels[0].slotCount).toBe(3);
     expect(resizeWheel(saved.wheels[0], 12)).toEqual(original);
@@ -112,7 +157,7 @@ describe('workbench configuration', () => {
   it('reorders only visible bindings and preserves hidden functions when reusing their artwork', () => {
     const wheel = resizeWheel(defaultWorkbench().wheels[0], 4);
     const changed = setWheelEffects(wheel, ['assist', 'omw', 'push', 'allin']);
-    expect(changed.slots.slice(0, 4)).toEqual(['copy', 'selectAll', 'paste', 'undo']);
+    expect(changed.slots.slice(0, 4)).toEqual(['capture', 'ocr', 'vision', 'plainPaste']);
     expect(changed.slots.slice(4)).toEqual(wheel.slots.slice(4));
     expect(new Set(changed.effects).size).toBe(changed.effects.length);
     expect(changed.slotCount).toBe(4);

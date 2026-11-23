@@ -2,7 +2,7 @@ import { Button, Combobox, Dropdown, FluentProvider, Input, Option, Textarea, mo
 import { Add24Regular, Apps24Regular, ArrowSync24Regular, Copy24Regular, Cursor24Regular, DataPie24Regular, Delete24Regular, Info24Regular, LocalLanguage24Regular, Play24Regular, Rocket24Regular, Settings24Regular, ShieldKeyhole24Regular, Sparkle24Regular, ResizeLarge24Regular, Timer24Regular, Speaker224Regular, SpeakerMute24Regular, MusicNote224Regular } from '@fluentui/react-icons';
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import type { DeskCommand, DeskReply, DeskState } from '../../shared/ipc';
-import { ACTION_KINDS, INPUT_SOURCES, hasPreparedInstruction, usesActionInput, wheelBindings, workflowBindingId, newAction, resizeWheel, setWheelEffects, validateWorkflow, type ActionDefinition, type ActionKind, type InputSource, type WorkbenchSettings } from '../../shared/actions';
+import { ACTION_KINDS, INPUT_SOURCES, hasPreparedInstruction, slotBindableActions, usesActionInput, wheelBindings, workflowBindingId, newAction, resizeWheel, setWheelEffects, validateWorkflow, type ActionDefinition, type ActionKind, type InputSource, type WorkbenchSettings } from '../../shared/actions';
 import { WHEEL_SLOT_LIMITS } from '../../shared/geometry';
 import { applyModelPreset, DESK_PROVIDERS } from '../../shared/workbenchModels';
 import { keyboardTriggers, triggerLabel, type Settings, type TriggerKey } from '../../shared/settings';
@@ -288,7 +288,7 @@ export function SettingsApp() {
                 ariaLabel={`${t.slot} ${i + 1} · ${t.slotName}`} placeholder={name(bindings.find(a => a.id === wheel.slots[i]) ?? { name: upstream.pingNames[effect] })}
                 onSave={value => edit({ wheels: wb.wheels.map(w => w.id === wheel.id ? { ...w, slotNames: w.slotNames.map((v, j) => i === j ? value : v) } : w) })}/></label>
               <Choice label={`${slotLabels[i]} · ${t.action}`} value={wheel.slots[i] ?? ''}
-                options={[{ id: '', name: t.empty }, ...bindings.map(a => ({ id: a.id, name: a.kind === 'workflow' ? t.workflows + ' · ' + name(a) : name(a) }))]}
+                options={[{ id: '', name: t.empty }, ...slotBindableActions(wb, wheel.id, wheel.slots[i]).map(a => ({ id: a.id, name: a.kind === 'workflow' ? t.workflows + ' · ' + name(a) : name(a) }))]}
                 onChange={id => edit({ wheels: wb.wheels.map(w => w.id === wheel.id ? { ...w, slots: w.slots.map((v, j) => i === j ? id || null : v) } : w) })}/>
               <Button size="small" appearance="subtle" icon={<Sparkle24Regular/>} onClick={() => createAI(i)}>{t.newAIAction}</Button>
             </div>

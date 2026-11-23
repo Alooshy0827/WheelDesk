@@ -4,9 +4,9 @@ import { ALL_PINGS, DEFAULT_WHEEL, isPingId, type PingId } from './pings';
 import { normalizeSlotCount, WHEEL_SLOT_LIMITS } from './geometry';
 
 export type InputSource = 'none' | 'selection' | 'clipboard' | 'manual' | 'screenshot' | 'previous';
-export type ActionKind = 'shortcut' | 'openApp' | 'openPath' | 'openUrl' | 'readClipboard' | 'writeClipboard'
+export type ActionKind = 'shortcut' | 'openPath' | 'openUrl' | 'readClipboard' | 'writeClipboard'
   | 'pasteText' | 'screenshot' | 'ai' | 'script' | 'delay' | 'switchWheel' | 'workflow';
-export const ACTION_KINDS: readonly ActionKind[] = ['shortcut', 'openApp', 'openPath', 'openUrl', 'readClipboard',
+export const ACTION_KINDS: readonly ActionKind[] = ['shortcut', 'openPath', 'openUrl', 'readClipboard',
   'writeClipboard', 'pasteText', 'screenshot', 'ai', 'script', 'delay', 'switchWheel', 'workflow'];
 export const INPUT_SOURCES: readonly InputSource[] = ['none', 'selection', 'clipboard', 'manual', 'screenshot', 'previous'];
 export interface AiCustomInstruction {
@@ -64,30 +64,58 @@ export const newAction = (id: string, kind: ActionKind): ActionDefinition => ({ 
   input: kind === 'ai' ? 'selection' : kind === 'pasteText' || kind === 'script' ? 'clipboard' : 'none',
   value: '', windows: '', mac: '', profileId: '', timeoutS: kind === 'ai' ? 120 : 30, output: 'card' });
 
+// Persisted action IDs cannot contain a colon, so a workflow and an action may share a raw ID.
+export const workflowBindingId = (id: string): string => 'workflow:' + id;
+
+// Workflow-only building blocks do not make sense as standalone wheel-slot triggers.
+const WORKFLOW_ONLY_KINDS: readonly ActionKind[] = ['delay', 'readClipboard'];
+
+export function wheelBindings(settings: WorkbenchSettings): ActionDefinition[] {
+  return [...settings.actions.filter(a => a.kind !== 'workflow'), ...settings.workflows.map(flow => ({
+    ...newAction(workflowBindingId(flow.id), 'workflow'), name: flow.name, value: flow.id,
+  }))];
+}
+
+/** Choices suitable for binding directly to a wheel slot (excludes workflow-only blocks and self-switches, unless already bound). */
+export function slotBindableActions(settings: WorkbenchSettings, wheelId: string, currentSlotId: string | null = null): ActionDefinition[] {
+  return wheelBindings(settings).filter(action => {
+    if (action.id === currentSlotId) return true;
+    if (WORKFLOW_ONLY_KINDS.includes(action.kind)) return false;
+    if (action.kind === 'switchWheel' && action.value === wheelId) return false;
+    return true;
+  });
+}
+
+export function usesActionInput(kind: ActionKind, inWorkflow = false): boolean {
+  if (kind === 'screenshot' || kind === 'readClipboard' || kind === 'workflow') return false;
+  // A workflow can pass its input through a shortcut, delay or preset switch to a later step.
+  return inWorkflow || !['shortcut', 'delay', 'switchWheel'].includes(kind);
+}
+
 export function defaultWorkbench(): WorkbenchSettings {
   const action = (id: string, name: string, nameEn: string, kind: ActionKind, extra: Partial<ActionDefinition> = {}): ActionDefinition =>
     ({ ...newAction(id, kind), name, nameEn, ...extra });
   const actions = [
-    ...[['copy', '复制', 'Copy', 'C'], ['paste', '粘贴', 'Paste', 'V'], ['selectAll', '全选', 'Select all', 'A'],
-      ['undo', '撤销', 'Undo', 'Z']].map(([id, zh, en, key]) => action(id, zh, en, 'shortcut', { value: `Primary+${key}` })),
     action('capture', '区域截图', 'Capture region', 'screenshot', { output: 'copy' }),
-    action('downloads', '下载文件夹', 'Downloads', 'openPath', { value: '$DOWNLOADS' }),
-    action('plainPaste', '纯文本粘贴', 'Paste plain text', 'pasteText', { input: 'clipboard' }),
-    action('toAI', 'AI 助手', 'AI assistant', 'switchWheel', { value: 'ai' }),
-    ...[
-      ['translateZh', '翻译成中文', 'Translate to Chinese', 'Translate the input into natural Simplified Chinese. Return only the translation.'],
-      ['translateEn', '翻译成英文', 'Translate to English', 'Translate the input into natural English. Return only the translation.'],
-      ['polish', '润色', 'Polish writing', 'Polish the input, preserving its language and meaning. Return only the revised text.'],
-      ['summarize', '摘要', 'Summarize', 'Summarize the input concisely, using the same language as the input.'],
-      ['email', '改写成邮件', 'Draft email', 'Rewrite the input as a clear professional email in its original language.'],
-      ['extract', '提取要点', 'Extract key points', 'Extract key points as a concise list, using the language of the input.'],
-    ].map(([id, zh, en, value]) => action(id, zh, en, 'ai', { value })),
     action('vision', '截图问答', 'Ask about screenshot', 'ai', { input: 'screenshot', value: 'Explain the selected screenshot clearly. Use Simplified Chinese.' }),
+    action('ocr', '截图提取文字', 'Extract text (OCR)', 'ai', { input: 'screenshot', output: 'copy', value: 'Extract all readable text from the screenshot verbatim. Preserve line breaks and return only the extracted text.' }),
+    action('plainPaste', '纯文本粘贴', 'Paste plain text', 'pasteText', { input: 'clipboard' }),
+    action('translate', '中英互译', 'Translate ZH/EN', 'ai', { value: 'If the input is primarily Chinese, translate it into natural English; otherwise translate it into natural Simplified Chinese. Return only the translation.' }),
+    action('polish', '润色', 'Polish writing', 'ai', { value: 'Polish the input, preserving its language and meaning. Return only the revised text.' }),
+    action('downloads', '下载文件夹', 'Downloads', 'openPath', { value: '$DOWNLOADS' }),
+    action('toAI', 'AI 助手', 'AI assistant', 'switchWheel', { value: 'ai' }),
+    action('summarize', '总结要点', 'Summarize key points', 'ai', { value: 'Summarize the input concisely as clear key points, using the same language as the input.' }),
+    action('explain', '解释代码 / 概念', 'Explain code / concept', 'ai', { value: 'Explain the input clearly and concisely, focusing on intent, behavior, and any potential issues. Use Simplified Chinese.' }),
+    action('screenshotTranslate', '截图翻译', 'Translate screenshot', 'ai', { input: 'screenshot', value: 'Translate any text visible in the screenshot into natural Simplified Chinese. Return only the translation.' }),
     action('toTools', '常用工具', 'Everyday tools', 'switchWheel', { value: 'tools' }),
   ];
   return { version: 1, activeWheelId: 'tools', actions, workflows: [], profiles: [], defaultProfileId: '', wheels: [
-    { id: 'tools', name: '常用工具', nameEn: 'Everyday tools', slotCount: 8, slots: actions.slice(0, 8).map(a => a.id), effects: [...DEFAULT_WHEEL], slotNames: Array(8).fill('') },
-    { id: 'ai', name: 'AI 助手', nameEn: 'AI assistant', slotCount: 8, slots: actions.slice(8).map(a => a.id), effects: [...DEFAULT_WHEEL], slotNames: Array(8).fill('') },
+    { id: 'tools', name: '常用工具', nameEn: 'Everyday tools', slotCount: 8,
+      slots: ['capture', 'vision', 'ocr', 'plainPaste', 'translate', 'polish', 'downloads', 'toAI'],
+      effects: [...DEFAULT_WHEEL], slotNames: Array(8).fill('') },
+    { id: 'ai', name: 'AI 助手', nameEn: 'AI assistant', slotCount: 8,
+      slots: ['translate', 'polish', 'summarize', 'explain', 'vision', 'ocr', 'screenshotTranslate', 'toTools'],
+      effects: [...DEFAULT_WHEEL], slotNames: Array(8).fill('') },
   ] };
 }
 const obj = (x: unknown): x is Record<string, unknown> => !!x && typeof x === 'object' && !Array.isArray(x);
@@ -147,20 +175,37 @@ export function setWheelEffects(wheel: WheelProfile, effects: readonly string[])
 export function normalizeWorkbench(raw: unknown): WorkbenchSettings {
   if (!obj(raw)) return defaultWorkbench();
   const actions = unique(list(raw.actions).flatMap(v => {
-    if (!obj(v) || !ACTION_KINDS.includes(v.kind as ActionKind) || !idOf(v.id)) return [];
-    return [{ id: idOf(v.id), name: str(v.name, 80), nameEn: str(v.nameEn, 80), kind: v.kind as ActionKind,
+    if (!obj(v) || !idOf(v.id)) return [];
+    // Keep the action ID: wheel slots and workflow steps refer to it.
+    const kind = v.kind === 'openApp' ? 'openPath' : ACTION_KINDS.find(k => k === v.kind);
+    if (!kind) return [];
+    return [{ id: idOf(v.id), name: str(v.name, 80), nameEn: str(v.nameEn, 80), kind,
       input: inputOf(v.input), value: str(v.value),
-      ...(v.kind === 'ai' && obj(v.aiCustom) ? { aiCustom: {
+      ...(kind === 'ai' && obj(v.aiCustom) ? { aiCustom: {
         description: str(v.aiCustom.description), source: str(v.aiCustom.source),
         instruction: typeof v.aiCustom.instruction === 'string' && v.aiCustom.instruction.length <= 20000 ? v.aiCustom.instruction : '',
         feedback: str(v.aiCustom.feedback, 4000),
       } } : {}),
-      windows: v.kind === 'script' ? scriptSource(v.windows) : str(v.windows),
-      mac: v.kind === 'script' ? scriptSource(v.mac) : str(v.mac),
+      windows: kind === 'script' ? scriptSource(v.windows) : str(v.windows),
+      mac: kind === 'script' ? scriptSource(v.mac) : str(v.mac),
       profileId: idOf(v.profileId), timeoutS: typeof v.timeoutS === 'number' && Number.isFinite(v.timeoutS)
-        ? Math.min(1800, Math.max(1, Math.round(v.timeoutS))) : v.kind === 'ai' ? 120 : 30,
+        ? Math.min(1800, Math.max(1, Math.round(v.timeoutS))) : kind === 'ai' ? 120 : 30,
       output: v.output === 'copy' || v.output === 'paste' ? v.output : 'card' } satisfies ActionDefinition];
   }));
+  const workflows = unique(list(raw.workflows).flatMap(v => {
+    if (!obj(v) || !idOf(v.id)) return [];
+    return [{ id: idOf(v.id), name: str(v.name, 80), steps: list(v.steps).slice(0, 50).flatMap(s =>
+      obj(s) && idOf(s.id) && idOf(s.actionId) ? [{ id: idOf(s.id), actionId: idOf(s.actionId), input: inputOf(s.input) }] : []) }];
+  }));
+  const bindings = new Map<string, string>();
+  for (const flow of workflows) {
+    const ref = workflowBindingId(flow.id);
+    bindings.set(ref, ref);
+  }
+  for (const action of actions) {
+    if (action.kind !== 'workflow') bindings.set(action.id, action.id);
+    else if (bindings.has(workflowBindingId(action.value))) bindings.set(action.id, workflowBindingId(action.value));
+  }
   const wheels = unique(list(raw.wheels).flatMap(v => {
     if (!obj(v) || !idOf(v.id)) return [];
     const slots = list(v.slots);
@@ -170,14 +215,9 @@ export function normalizeWorkbench(raw: unknown): WorkbenchSettings {
     return [{ id: idOf(v.id), name: str(v.name, 80), nameEn: str(v.nameEn, 80),
       slotCount, effects: normalizeEffects(v.effects, capacity),
       slotNames: Array.from({ length: capacity }, (_, i) => str(names[i], 80).replace(/[\r\n\t]/g, ' ').trim()),
-      slots: Array.from({ length: capacity }, (_, i) => actions.some(a => a.id === slots[i]) ? String(slots[i]) : null) }];
+      slots: Array.from({ length: capacity }, (_, i) => typeof slots[i] === 'string' ? bindings.get(slots[i]) ?? null : null) }];
   }));
   if (!wheels.length) wheels.push({ id: 'tools', name: '常用工具', nameEn: 'Everyday tools', slotCount: 8, slots: Array(8).fill(null), effects: [...DEFAULT_WHEEL], slotNames: Array(8).fill('') });
-  const workflows = unique(list(raw.workflows).flatMap(v => {
-    if (!obj(v) || !idOf(v.id)) return [];
-    return [{ id: idOf(v.id), name: str(v.name, 80), steps: list(v.steps).slice(0, 50).flatMap(s =>
-      obj(s) && idOf(s.id) && idOf(s.actionId) ? [{ id: idOf(s.id), actionId: idOf(s.actionId), input: inputOf(s.input) }] : []) }];
-  }));
   const profiles = unique(list(raw.profiles).slice(0, 20).flatMap(v => {
     if (!obj(v) || !idOf(v.id)) return [];
     return [{ id: idOf(v.id), name: str(v.name, 80), kind: 'builtin', provider: DESK_PROVIDERS.find(p => p.id === v.provider)?.id ?? 'custom',
@@ -199,10 +239,11 @@ export function validateWorkflow(flow: WorkflowDefinition, settings: WorkbenchSe
     const a = settings.actions.find(a => a.id === step.actionId);
     if (!a) { issues.push({ step: i, code: 'missing' }); return; }
     if (a.kind === 'workflow') issues.push({ step: i, code: 'nested' });
-    if (i === 0 && step.input === 'previous') issues.push({ step: i, code: 'previous' });
-    const incomingImage = step.input === 'screenshot' || (step.input === 'previous' && image);
-    if (incomingImage && ['script', 'pasteText', 'openUrl', 'openPath', 'openApp'].includes(a.kind)) issues.push({ step: i, code: 'image' });
-    image = a.kind === 'screenshot' || (incomingImage && ['writeClipboard', 'delay'].includes(a.kind));
+    const input = usesActionInput(a.kind, true) ? step.input : 'none';
+    if (i === 0 && input === 'previous') issues.push({ step: i, code: 'previous' });
+    const incomingImage: boolean = input === 'screenshot' || (input === 'previous' && image);
+    if (incomingImage && ['script', 'pasteText', 'openUrl', 'openPath'].includes(a.kind)) issues.push({ step: i, code: 'image' });
+    image = a.kind === 'screenshot' || (incomingImage && ['writeClipboard', 'delay', 'switchWheel', 'shortcut'].includes(a.kind));
   });
   return issues;
 }
