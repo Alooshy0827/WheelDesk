@@ -45,6 +45,7 @@ interface Props<T extends string> {
   emptyId?: T;
   trigger: string;
   pool: readonly PoolItem<T>[];
+  showTileNames?: boolean;
   defaults: { wheel: readonly T[]; center: T };
   labels: { title: string; desc: string; poolTitle: string; poolDesc: string };
   /** Rendered under the pool's tiles, outside their scroll box, so it stays in view however long the pool is. */
@@ -69,7 +70,7 @@ const activate = (fn: () => void) => (e: KeyboardEvent) => {
 };
 
 export function WheelEditor<T extends string>({
-  wheel, center, centerOn, centerEditable = true, centerLabel, slotLabels, emptyId, trigger, pool, defaults, labels, poolExtra, onDropFiles, onFxPick, fxIds, fxFor, onChange, onPreview,
+  wheel, center, centerOn, centerEditable = true, centerLabel, slotLabels, emptyId, trigger, pool, showTileNames = true, defaults, labels, poolExtra, onDropFiles, onFxPick, fxIds, fxFor, onChange, onPreview,
 }: Props<T>) {
   const t = useText();
   const [picked, setPicked] = useState<WheelSource<T> | null>(null);
@@ -226,13 +227,14 @@ export function WheelEditor<T extends string>({
               return (
                 <div key={p.id} className={`weCell${p.onRemove ? ' removable' : ''}`}>
                   <div role="button" tabIndex={0}
+                    aria-label={showTileNames ? undefined : slot >= 0 ? t.wheelSlotLabel(slotName(slot), p.name) : p.name}
                     className={`weTile${isPicked((s) => s.from === 'pool' && s.id === p.id)}`}
                     {...dragProps({ from: 'pool', id: p.id })} onClick={pick} onKeyDown={activate(pick)}
                     onContextMenu={(e) => openFx(p.id, e)}>
                     {p.badge ? <span className="weNew">{p.badge}</span> : null}
                     {slot >= 0 ? <span className="weWhere">{slotName(slot)}</span> : null}
                     <img src={p.icon} alt="" />
-                    {p.name}
+                    {showTileNames && p.name}
                   </div>
                   {p.tool ? (
                     <button type="button" className={`weTool${p.tool.on ? ' on' : ''}`} aria-label={p.tool.label} title={p.tool.label}

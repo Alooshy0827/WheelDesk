@@ -1,6 +1,5 @@
 export const icons: Record<string, string> = {
   shortcut: 'M7 3H4a1 1 0 0 0-1 1v3a2 2 0 1 0 2-2h14a2 2 0 1 0-2-2v18a2 2 0 1 0 2-2H5a2 2 0 1 0 2 2V3',
-  openApp: 'M3 3h7v7H3z M14 3h7v7h-7z M3 14h7v7H3z M14 14h7v7h-7z',
   openPath: 'M3 6h7l2 3h9v11H3z M3 6V4h7l2 2h7v3',
   openUrl: 'M10 14l4-4 M8 16l-2 2a4 4 0 0 1-5-5l5-5a4 4 0 0 1 5 0 M13 16a4 4 0 0 0 5 0l5-5a4 4 0 0 0-5-5l-2 2',
   readClipboard: 'M8 4H5v17h14V4h-3 M8 2h8v5H8z M8 12h8 M8 16h5',

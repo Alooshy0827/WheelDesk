@@ -24,6 +24,22 @@ describe('ActionRunner', () => {
     expect(runner.state.status).toBe('completed');
     expect(states.some(s => s.step === 2 && s.status === 'running')).toBe(true);
   });
+  it('runs a workflow with no proxy action and ignores obsolete screenshot input', async () => {
+    const { settings } = setup();
+    settings.workflows[0].steps = [{ id: '1', actionId: 'capture', input: 'previous' }];
+    settings.actions = settings.actions.filter(a => a.kind !== 'workflow');
+    const captures: string[] = [];
+    const runner = new ActionRunner({ publish: () => {},
+      input: async () => { throw new Error('unexpected input prompt'); },
+      execute: async action => { captures.push(action.id); return {}; },
+    });
+    await runner.run('workflow:f', settings, target);
+    expect(runner.state).toMatchObject({ status: 'completed', name: 'f' });
+    settings.actions = settings.actions.map(a => a.id === 'capture' ? { ...a, input: 'screenshot' } : a);
+    await runner.run('capture', settings, target);
+    expect(runner.state.status).toBe('completed');
+    expect(captures).toEqual(['capture', 'capture']);
+  });
   it('stops at a failed step and preserves streamed partial output', async () => {
     const ran: string[] = [];
     const { runner, settings } = setup(async (a, _, ctx) => { ran.push(a.id); ctx.delta('partial'); throw new Error('network'); });

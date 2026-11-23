@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { idleRun, validateWorkflow, type ActionDefinition, type ActionValue, type InputSource,
+import { idleRun, usesActionInput, validateWorkflow, wheelBindings, type ActionDefinition, type ActionValue, type InputSource,
   type RunState, type WorkbenchSettings } from '../../shared/actions';
 import { presentationFor, type RunPresentation } from './presentation';
 
@@ -30,7 +30,7 @@ export class ActionRunner {
   async run(id: string, settings: WorkbenchSettings, target: RunTarget): Promise<void> {
     if (this.busy) throw new Error('busy');
     const snapshot = structuredClone(settings);
-    const action = snapshot.actions.find(a => a.id === id);
+    const action = snapshot.actions.find(a => a.id === id) ?? wheelBindings(snapshot).find(a => a.id === id);
     if (!action) throw new Error('missing');
     const flow = action.kind === 'workflow' ? snapshot.workflows.find(f => f.id === action.value) : undefined;
     if (action.kind === 'workflow' && (!flow || validateWorkflow(flow, snapshot).length)) throw new Error('workflowInvalid');
@@ -48,7 +48,8 @@ export class ActionRunner {
         const definition = snapshot.actions.find(a => a.id === step.actionId);
         if (!definition) throw new Error('missing');
         this.emit({ step: index + 1, text: '', image: undefined });
-        const value = await this.deps.input(step.input, previous, target, controller.signal);
+        const value = usesActionInput(definition.kind, Boolean(flow))
+          ? await this.deps.input(step.input, previous, target, controller.signal) : {};
         controller.signal.throwIfAborted();
         const timeout = AbortSignal.timeout(definition.timeoutS * 1000);
         const signal = AbortSignal.any([controller.signal, timeout]);

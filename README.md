@@ -1,6 +1,6 @@
 # WheelDesk
 
-[简体中文](README.zh-CN.md) · Internal beta 0.1.13
+[简体中文](README.zh-CN.md) · Internal beta 0.1.18
 
 A desktop action wheel for everyday tools, AI instructions, and local workflows. Hold Alt (Option on macOS) and press the left mouse button to show the wheel immediately. Move to an action and release the mouse button. Move back into the center, press Escape, or right-click to cancel.
 
@@ -12,7 +12,7 @@ The settings UI is modified directly from lolPing: its Fluent controls, platform
 
 - Original wheel visuals and effects: hover glow/scale, expanding rings, pop/bobbing and All In collision, with original sounds. Each effect is paired with an independent custom function; previewing effects runs no function.
 - Multiple editable wheels with 2–12 spokes each (default 8). Shrinking hides the last slots and expanding restores their bindings; switch in the tray or with a wheel action.
-- Keyboard shortcuts, applications, files, folders, URLs, clipboard operations and region screenshots.
+- Use **Open an app, file, or folder** for local paths, with optional platform-specific paths. Existing actions keep their wheel and workflow bindings. Other actions include opening URLs, sending keyboard shortcuts, clipboard operations and region screenshots.
 - OpenAI-compatible and Anthropic APIs, including local endpoints. Choose a model and instruction per action.
 - Streamed answer cards with copy and guarded fill-back. Text actions do not automatically send screenshots.
 - Linear workflows with explicit inputs and previous-step outputs. Shell on macOS and PowerShell on Windows receive input on stdin.
@@ -28,14 +28,14 @@ Open the DMG and drag WheelDesk to Applications. This internal build uses a pers
 1. Open WheelDesk. In Settings, open Accessibility settings and allow WheelDesk, the helper reconnects automatically. Migrating from 0.1.4 or earlier requires removing the old entry and adding /Applications/WheelDesk.app once. Later updates retain the same signing identity.
 2. Grant Screen Recording when using screenshots. Screen capture stays off until you choose a screenshot action.
 3. In Models, add a service, choose a provider, enter its key, then choose or type a model. Fetch models offers a searchable list. **Save and test connection** sends a short text request and securely saves a typed key only after success; failed tests preserve the previous key. API format/address are configured automatically and hidden under **Advanced settings** by default. Custom services expose the URL directly; local services usually need no key. Tests may incur a small API charge and do not verify image support.
-4. In Wheels, choose the spoke count, then drag original effects between positions, then choose each slot’s function in **Bind custom functions**. Swapping effects moves their functions with them; replacing an effect keeps the slot’s function. Click a palette tile to preview it without running its function. Empty function slots still play their selected effects without executing an action. Each position has a custom name, which overrides its function/effect name; leave it blank for automatic naming. Names follow slots when reordered and survive shrinking the wheel. Size, duration, volume and mute are configurable. Changes save automatically; use the tray to switch wheels.
+4. In Wheels, choose the spoke count, then drag original effects between positions, then choose each slot’s function in **Bind custom functions**. Swapping effects moves their functions with them; replacing an effect keeps the slot’s function. Click a palette tile to preview it without running its function. Empty function slots still play their selected effects without executing an action. Each position has a custom name, which overrides its function/effect name; leave it blank for automatic naming. Names follow slots when reordered and survive shrinking the wheel. Size, duration, volume and mute are configurable. Changes save automatically. Select a wheel preset to switch immediately, or switch from the tray.
 5. To test an action from settings, click Run and switch to the target application within the three-second countdown.
 
 A text action with no readable selection asks for input; it never silently sends the clipboard. Result cards do not activate the app while streaming. Fill-back requires the original window and selection; when they changed, copy the answer instead.
 
 ## Workflows
 
-Create reusable actions first, then add ordered workflow steps. Choose each input explicitly: fixed content, selection, clipboard text, manual input, selected screenshot or previous result. A workflow is automatically added to the action library and can be assigned to a wheel slot.
+Create reusable actions first, then add ordered workflow steps. Choose each input explicitly: fixed content, selection, clipboard text, manual input, selected screenshot or previous result. Assign the workflow directly from the function list for a wheel slot. Test and edit its steps on the Workflows page.
 
 Scripts run as the current user. PowerShell execution policy is set only for the child process. No model-generated commands are executed automatically. Script working directories are temporary; use absolute paths for persistent files. A failed step stops the workflow. Cancellation stops the current script process group/tree; it does not undo steps already completed.
 

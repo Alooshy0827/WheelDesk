@@ -221,7 +221,7 @@ async function execute(action: ActionDefinition, value: ActionValue, ctx: Execut
       if (result !== 'ok') throw new Error(result === 'window' ? 'target' : result);
       break;
     }
-    case 'openApp': case 'openPath': {
+    case 'openPath': {
       const path = (mac ? action.mac : action.windows) || text;
       if (!path) throw new Error('path');
       const error = await shell.openPath(path === '$DOWNLOADS' ? app.getPath('downloads') : path);
@@ -329,6 +329,11 @@ async function handle(sender: Electron.WebContents, raw: unknown): Promise<DeskR
         volume: s.volume, muted: s.muted, tickSound: s.tickSound }, platform);
       const problems = store.problems.length;
       await clearChangedModelKeys(store.get().workbench.profiles, normalized.workbench.profiles, secrets);
+      // An unrelated autosave must keep a newer selection made from the tray or a wheel action.
+      if (raw.preserveActiveWheel === true) {
+        const currentId = store.get().workbench.activeWheelId;
+        if (normalized.workbench.wheels.some(w => w.id === currentId)) normalized.workbench.activeWheelId = currentId;
+      }
       store.update(normalized); await store.flush();
       if (store.problems.length > problems) throw new Error('saveFailed');
       return { ok: true, state: state() };

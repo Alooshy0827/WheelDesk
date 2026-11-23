@@ -6,6 +6,7 @@ import { pickSlice, WHEEL } from '../../shared/geometry';
 import { isPingId, type PingId } from '../../shared/pings';
 import { physicalToDip, type DisplayMap } from '../coords';
 import type { HelperEvent } from '../../shared/protocol';
+import { wheelBindings } from '../../shared/actions';
 import { strings } from '../../shared/i18n';
 
 export type SurfaceRole = 'settings' | 'result' | 'overlay';
@@ -99,7 +100,8 @@ export class DesktopSurfaces {
       const serial = ++this.serial;
       const slots = wheel.slots.slice(0, wheel.slotCount);
       const effects = wheel.effects.slice(0, wheel.slotCount);
-      const items = slots.map(id => wb.actions.find(a => a.id === id));
+      const bindings = wheelBindings(wb);
+      const items = slots.map(id => bindings.find(a => a.id === id));
       const effectNames = strings(lang, this.mac ? 'mac' : 'win').pingNames;
       const labels = items.map((a, i) => wheel.slotNames[i] || (a ? lang === 'en' ? a.nameEn || a.name : a.name : effectNames[effects[i]]));
       const visual = this.visual();

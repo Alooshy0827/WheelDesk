@@ -98,3 +98,23 @@ The new compass template has 22 × 22 and 44 × 44 transparent PNG representatio
 ## League in-game UI & Plan A typography
 
 Implemented the 1:1 League of Legends in-game ESC options UI (double-beveled brass outer frame with four SVG Hextech corner ornaments, centered gold filigree header with live status gem, vertical category navigation, square brass in-game checkboxes, gold-filled faceted diamond sliders with recessed readouts, metallic beveled buttons, Summoner's Rift smart-ping wheel editor with rune-slot effect tiles, bottom options bar, and matching Hextech result modal) together with bundled offline SIL OFL 1.1 fonts (`Cinzel` Bold for display titles and `Barlow Condensed` Bold for HUD readouts) plus heavy CJK sans-serif styling. Verified in the real macOS Electron app at 1020 × 700 with isolated settings and simulated gestures: `npm run typecheck`, `npm run test:helper` (1,282 native assertions), `npm test` (139 files / 2,176 passed, 5 skipped), `npm run build`, and `WHEELDESK_SMOKE_GESTURES=1 npm run smoke` all passed with zero renderer errors. Built and verified `release/WheelDesk-0.1.13-arm64.dmg` in hidden staging with the pinned signing certificate (`AC9A0CF458C072B2B8D7FF5BC9D541404DE3C2A6`), confirmed `hdiutil verify` valid, and removed the temporary `.app` staging bundle. The installed `/Applications/WheelDesk.app` was not replaced automatically; Windows rendering has not been visually checked.
+
+## Wheel preset selector (0.1.14)
+
+Checked the localized preset row in the macOS Electron window. Selecting another preset changed the editor selection, and clicking “Use this wheel” persisted the active wheel. Verified switching in both directions with isolated settings. Typecheck, production build, native helper tests, JavaScript tests and the stock simulated-gesture smoke suite passed. Verified the signed DMG and installed 0.1.14 at the canonical application path.
+
+## Immediate wheel preset switching (0.1.15)
+
+The macOS Electron smoke suite selected the AI preset in the dropdown, opened that wheel with a simulated native gesture, cancelled at the center, reloaded the settings window and selected the tools preset again. An unrelated settings save carrying the previous wheel ID preserved the active selection. Inspected the localized row and removal of the activation button. Typecheck, build, 1,282 native assertions and 2,176 JavaScript tests passed (five skipped). The first smoke run reached final screenshot capture but Electron returned UnknownVizError. The full rerun passed after foregrounding the test window for that capture. Verified the DMG and installed the fixed-signature update over 0.1.14.
+
+## Direct workflow bindings and settings cleanup (0.1.16)
+
+The macOS Electron smoke suite created a workflow in Settings, added a preset-switch step, bound the workflow directly to a slot, and triggered that slot through the simulated native gesture. The wheel showed the workflow name and the step switched to the AI preset. The saved configuration contained no generated action for the new workflow. Regression tests cover legacy workflow bindings, including hidden slots and colliding raw action/workflow IDs, and suppression of redundant screenshot inputs. Checked the revised settings layout. Production build, typecheck, 1,282 native assertions and 2,178 JavaScript tests passed (five skipped). The fixed-signature arm64 DMG passed checksum verification.
+
+## Unified local open action (0.1.17)
+
+Settings normalization maps the legacy openApp kind to openPath while preserving action IDs. Tested platform-specific paths, custom slot names, visible and hidden bindings, workflow references, and a second save/load cycle. The macOS Electron smoke suite selected a migrated app action using the simulated native wheel and verified the original path at the shell.openPath boundary using a test stub. Typecheck, production build, 1,282 native assertions and 2,178 JavaScript tests passed (five skipped).
+
+## Action library guidance and effect palette (0.1.18)
+
+Inspected the macOS Electron wheel editor. All 12 effect tiles have accessible labels and display only their icons and any assigned position badges. The real action library row explains creating and editing actions. The full simulated-gesture smoke suite, typecheck, production build, native helper tests and JavaScript regression suite passed. Verified the signed macOS installer checksum.

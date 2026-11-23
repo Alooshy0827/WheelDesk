@@ -344,7 +344,7 @@ export interface DeskState {
 }
 export type DeskCommand =
   | { type: 'state' }
-  | { type: 'save'; settings: unknown }
+  | { type: 'save'; settings: unknown; preserveActiveWheel?: boolean }
   | { type: 'run'; id: string }
   | { type: 'prepareAI'; id: string; regenerate: boolean }
   | { type: 'cancelPrepareAI' }
