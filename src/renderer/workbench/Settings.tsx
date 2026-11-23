@@ -1,8 +1,8 @@
 import { Button, Combobox, Dropdown, FluentProvider, Input, Option, Textarea, motionTokens } from '@fluentui/react-components';
-import { Add24Regular, Apps24Regular, ArrowSync24Regular, Copy24Regular, Cursor24Regular, DataPie24Regular, Delete24Regular, Info24Regular, LocalLanguage24Regular, Play24Regular, Power24Regular, Rocket24Regular, Settings24Regular, ShieldKeyhole24Regular, Sparkle24Regular, ResizeLarge24Regular, Timer24Regular, Speaker224Regular, SpeakerMute24Regular, MusicNote224Regular } from '@fluentui/react-icons';
+import { Add24Regular, Apps24Regular, ArrowSync24Regular, Copy24Regular, Cursor24Regular, DataPie24Regular, Delete24Regular, Info24Regular, LocalLanguage24Regular, Play24Regular, Rocket24Regular, Settings24Regular, ShieldKeyhole24Regular, Sparkle24Regular, ResizeLarge24Regular, Timer24Regular, Speaker224Regular, SpeakerMute24Regular, MusicNote224Regular } from '@fluentui/react-icons';
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import type { DeskCommand, DeskReply, DeskState } from '../../shared/ipc';
-import { ACTION_KINDS, INPUT_SOURCES, hasPreparedInstruction, defaultWorkbench, newAction, resizeWheel, setWheelEffects, validateWorkflow, type ActionDefinition, type ActionKind, type InputSource, type WorkbenchSettings } from '../../shared/actions';
+import { ACTION_KINDS, INPUT_SOURCES, hasPreparedInstruction, usesActionInput, wheelBindings, workflowBindingId, newAction, resizeWheel, setWheelEffects, validateWorkflow, type ActionDefinition, type ActionKind, type InputSource, type WorkbenchSettings } from '../../shared/actions';
 import { WHEEL_SLOT_LIMITS } from '../../shared/geometry';
 import { applyModelPreset, DESK_PROVIDERS } from '../../shared/workbenchModels';
 import { keyboardTriggers, triggerLabel, type Settings, type TriggerKey } from '../../shared/settings';
@@ -12,6 +12,7 @@ import { WheelEditor } from '../settings/components/WheelEditor';
 import { DraftInput } from '../settings/components/mateFields';
 import { TextContext } from '../settings/text';
 import { leagueTheme } from './leagueTheme';
+import { attachSettingsUiSounds, playUiSound, setUiAudioSettings } from './uiSounds';
 import { barFrames } from '../settings/navIndicator';
 import { ALL_PINGS, DEFAULT_WHEEL, FALLBACK_TEXTURE, textureUrl } from '../../shared/pings';
 import '../settings/settings.css';
@@ -37,14 +38,16 @@ export function SettingsApp() {
   const [draft, setDraft] = useState<Settings | null>(null);
   const draftRef = useRef<Settings | null>(null);
   const revision = useRef(0), savedRevision = useRef(0);
+  const presetRevision = useRef(0);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const queue = useRef<Promise<boolean>>(Promise.resolve(true));
   const [message, setMessage] = useState('');
   const [failed, setFailed] = useState(false);
+  const [saveFailed, setSaveFailed] = useState(false);
   const [active, setActive] = useState<Section>('trigger');
-  const main = useRef<HTMLElement>(null), nav = useRef<HTMLElement>(null), bar = useRef<HTMLSpanElement>(null);
+  const main = useRef<HTMLElement>(null), nav = useRef<HTMLElement>(null), bar = useRef<HTMLSpanElement>(null), rootRef = useRef<HTMLDivElement>(null);
   const barTop = useRef<number | null>(null), jumping = useRef(false);
-  const [wheelId, setWheelId] = useState(''), [actionId, setActionId] = useState(''), [flowId, setFlowId] = useState(''), [profileId, setProfileId] = useState('');
+  const [actionId, setActionId] = useState(''), [flowId, setFlowId] = useState(''), [profileId, setProfileId] = useState('');
   const [key, setKey] = useState(''), [modelIds, setModelIds] = useState<string[]>([]);
   const [pending, setPending] = useState(false);
   const [aiPending, setAiPending] = useState(false);
@@ -70,8 +73,16 @@ export function SettingsApp() {
     if (previous !== null && !matchMedia('(prefers-reduced-motion: reduce)').matches)
       bar.current.animate(barFrames(previous, top, 16), { duration: motionTokens.durationSlow, easing: motionTokens.curveDecelerateMid });
   }, [active, state?.lang]);
+  useEffect(() => {
+    if (draft) setUiAudioSettings(draft);
+  }, [draft?.volume, draft?.muted]);
+  const mounted = Boolean(state && draft);
+  useEffect(() => {
+    if (!mounted || !rootRef.current) return;
+    return attachSettingsUiSounds(rootRef.current);
+  }, [mounted]);
   if (!state || !draft) return null;
-  const t = deskText(state.lang), upstream = { ...strings(state.lang, state.platform), wheelPickHint: (name: string) => t.wheelPick.replace('{{name}}', name) }, wb = draft.workbench;
+  const t = deskText(state.lang), upstream = { ...strings(state.lang, state.platform), wheelPickHint: () => t.wheelPick }, wb = draft.workbench;
   const name = (a: { name: string; nameEn?: string }) => state.lang === 'en' ? a.nameEn || a.name : a.name;
   const notice = (text: string, error = false) => { setMessage(text); setFailed(error); };
   const invoke = async (cmd: DeskCommand): Promise<DeskReply> => {
@@ -80,10 +91,11 @@ export function SettingsApp() {
   };
   const flush = (): Promise<boolean> => {
     if (timer.current) { clearTimeout(timer.current); timer.current = null; }
-    const at = revision.current, settings = structuredClone(draftRef.current);
+    const at = revision.current, presetAt = presetRevision.current, settings = structuredClone(draftRef.current);
     if (!settings) return Promise.resolve(false);
     queue.current = queue.current.catch(() => false).then(async () => {
-      const reply = await invoke({ type: 'save', settings });
+      const reply = await invoke({ type: 'save', settings, preserveActiveWheel: presetAt <= savedRevision.current });
+      setSaveFailed(!reply.ok);
       if (reply.ok) {
         savedRevision.current = at;
         if (reply.state && revision.current === at) { draftRef.current = structuredClone(reply.state.settings); setDraft(draftRef.current); }
@@ -115,10 +127,29 @@ export function SettingsApp() {
   };
   const remove = (fn: () => void) => { if (window.confirm(t.confirmDelete)) fn(); };
   const source = (value: InputSource, onChange: (s: InputSource) => void, previous = true) => <Choice label={t.input} value={value} options={INPUT_SOURCES.filter(i => previous || i !== 'previous').map(id => ({ id, name: t.source[id] }))} onChange={v => onChange(v as InputSource)}/>;
-  const wheel = wb.wheels.find(w => w.id === wheelId) ?? wb.wheels.find(w => w.id === wb.activeWheelId) ?? wb.wheels[0];
+  const wheel = wb.wheels.find(w => w.id === wb.activeWheelId) ?? wb.wheels[0];
+  const selectPreset = (id: string, wheels?: WorkbenchSettings['wheels']) => {
+    edit(wheels ? { activeWheelId: id, wheels } : { activeWheelId: id });
+    presetRevision.current = revision.current;
+    void flush();
+  };
+  const addPreset = (copy: boolean) => {
+    const id = uid();
+    const preset = copy
+      ? { ...structuredClone(wheel), id, name: wheel.name + ' 2', nameEn: wheel.nameEn + ' 2' }
+      : { id, name: t.newWheel, nameEn: t.newWheel, slotCount: 8, slots: Array(8).fill(null),
+          effects: [...DEFAULT_WHEEL], slotNames: Array(8).fill('') };
+    selectPreset(id, [...wb.wheels, preset]);
+  };
+  const removePreset = () => {
+    const remaining = wb.wheels.filter(w => w.id !== wheel.id);
+    if (remaining.length) selectPreset(remaining[0].id, remaining);
+  };
   const effects = wheel.effects.slice(0, wheel.slotCount);
   const slotLabels = effects.map((_, i) => wheel.slotCount === 8 ? upstream.slotNames[i] : `${t.slot} ${i + 1}`);
-  const action = wb.actions.find(a => a.id === actionId) ?? wb.actions[0];
+  const actions = wb.actions.filter(a => a.kind !== 'workflow');
+  const bindings = wheelBindings(wb);
+  const action = actions.find(a => a.id === actionId) ?? actions[0];
   const flow = wb.workflows.find(f => f.id === flowId) ?? wb.workflows[0];
   const profile = wb.profiles.find(p => p.id === profileId) ?? wb.profiles[0];
   const patchAction = (patch: Partial<ActionDefinition>) => edit({ actions: wb.actions.map(a => a.id === action.id ? { ...a, ...patch } : a) });
@@ -143,12 +174,12 @@ export function SettingsApp() {
       if (reply.ok && reply.state) {
         draftRef.current = structuredClone(reply.state.settings); setDraft(draftRef.current);
         notice(t.aiReady);
+        playUiSound('success');
       }
     } finally { aiBusy.current = false; setAiPending(false); }
   };
 
-  const patchFlow = (patch: Partial<typeof flow>) => edit({ workflows: wb.workflows.map(f => f.id === flow.id ? { ...f, ...patch } : f),
-    ...(patch.name !== undefined ? { actions: wb.actions.map(a => a.kind === 'workflow' && a.value === flow.id ? { ...a, name: patch.name ?? '', nameEn: patch.name ?? '' } : a) } : {}) });
+  const patchFlow = (patch: Partial<typeof flow>) => edit({ workflows: wb.workflows.map(f => f.id === flow.id ? { ...f, ...patch } : f) });
   const resetModelStatus = () => { modelRevision.current++; setModelStatus(null); setModelIds([]); setModelQuery(''); setKeyVisible(false); };
   const patchProfile = (patch: Partial<typeof profile>) => {
     modelRevision.current++; setModelStatus(null);
@@ -174,6 +205,7 @@ export function SettingsApp() {
           setKey(''); setKeyVisible(false);
         }
         setModelStatus({ text: t.connectionOK.replace('{{ms}}', String(reply.latencyMs ?? 0)), error: false });
+        playUiSound('success');
       }
     } catch { if (at === modelRevision.current) setModelStatus({ text: t.failed, error: true }); }
     finally { modelBusy.current = false; setPending(false); setModelOperation(''); }
@@ -191,7 +223,7 @@ export function SettingsApp() {
     </svg>
   );
   return <FluentProvider theme={leagueTheme} style={{ background: '#010a13', height: '100%' }}><TextContext.Provider value={upstream}>
-    <div className="app wdSettings">
+    <div className="app wdSettings" ref={rootRef}>
       {cornerOrnament('tl')}{cornerOrnament('tr')}{cornerOrnament('bl')}{cornerOrnament('br')}
       <header className="titlebar">
         <div className="wdTitleLeft"/>
@@ -215,8 +247,8 @@ export function SettingsApp() {
         <div className="wdSidebarFoot">
           <span className="wdVersionBadge">{t.about}</span>
           {message && <span role="status" className={failed ? 'wdError' : 'desc'}>{message}</span>}
-          {aiPending && <Button size="small" onClick={() => void invoke({ type: 'cancelPrepareAI' })}>{t.cancel}</Button>}
-          {failed && <Button disabled={aiPending} size="small" onClick={() => void flush()}>{t.save}</Button>}
+          {aiPending && <Button data-sfx="cancel" size="small" onClick={() => void invoke({ type: 'cancelPrepareAI' })}>{t.cancel}</Button>}
+          {saveFailed && <Button disabled={aiPending} size="small" onClick={() => void flush()}>{t.retrySave}</Button>}
         </div>
       </nav>
       <main className="content" inert={aiPending} aria-busy={aiPending} ref={main} onScroll={onScroll} onScrollEnd={() => { jumping.current = false; }}>
@@ -227,17 +259,22 @@ export function SettingsApp() {
         <div className="card status"><div className={`dot${state.helper === 'failed' || state.helper === 'noAccess' ? ' failed' : off ? ' off' : ''}`}/><div className="wdStatusRing"><img className="statusPing" src={logo} alt=""/></div><div className="lbl"><b>{statusTitle}</b><span className="desc">{t.wheelHelp}</span></div><OnOffSwitch checked={draft.enabledOnStart} onChange={enabledOnStart => changeSettings({ enabledOnStart })}/></div>
         <div className="section" id="trigger">{upstream.navTrigger}</div>
         <SettingRow icon={<Cursor24Regular/>} title={t.trigger} description={t.wheelHelp} dim={off}><Choice label={t.trigger} value={typeof draft.trigger === 'string' ? draft.trigger : 'custom'} options={[...keyboardTriggers(state.platform), 'mouse4', 'mouse5'].map(id => ({ id, name: triggerLabel(id as TriggerKey, state.lang, state.platform) }))} onChange={v => changeSettings({ trigger: v as TriggerKey })}/></SettingRow>
-        <SwitchRow icon={<Power24Regular/>} title={t.enabled} checked={draft.enabledOnStart} onChange={v => changeSettings({ enabledOnStart: v })}/>
         <div className="section" id="wheels">{t.wheels}</div>
-        <SettingRow icon={<DataPie24Regular/>} title={t.wheels} description={t.wheelSlotsHelp}><Choice label={t.wheels} value={wheel.id} options={wb.wheels.map(w => ({ id: w.id, name: name(w) }))} onChange={setWheelId}/><Button icon={<Add24Regular/>} aria-label={t.newWheel} onClick={() => { const id = uid(); edit({ wheels: [...wb.wheels, { id, name: t.newWheel, nameEn: t.newWheel, slotCount: 8, slots: Array(8).fill(null), effects: [...DEFAULT_WHEEL], slotNames: Array(8).fill('') }] }); setWheelId(id); }}/></SettingRow>
-        <ExpanderRow icon={<Settings24Regular/>} title={name(wheel)} control={<div className="wdButtons"><Button icon={<Copy24Regular/>} onClick={() => { const id = uid(); edit({ wheels: [...wb.wheels, { ...structuredClone(wheel), id, name: wheel.name + ' 2', nameEn: wheel.nameEn + ' 2' }] }); setWheelId(id); }}>{t.duplicate}</Button><Button icon={<Delete24Regular/>} disabled={wb.wheels.length <= 1} onClick={() => remove(() => { edit({ wheels: wb.wheels.filter(w => w.id !== wheel.id) }); setWheelId(''); })}>{t.remove}</Button><Button className="wdBtnPrimary" appearance="primary" disabled={wb.activeWheelId === wheel.id} onClick={() => edit({ activeWheelId: wheel.id })}>{wb.activeWheelId === wheel.id ? t.active : t.activate}</Button></div>}><div className="expPane"><div className="mateFields"><span>{t.name}</span><DraftInput key={wheel.id + 'name'} value={wheel.name} maxLength={80} onSave={v => edit({ wheels: wb.wheels.map(w => w.id === wheel.id ? { ...w, name: v } : w) })}/><span>{t.nameEn}</span><DraftInput key={wheel.id + 'en'} value={wheel.nameEn} maxLength={80} onSave={v => edit({ wheels: wb.wheels.map(w => w.id === wheel.id ? { ...w, nameEn: v } : w) })}/></div></div></ExpanderRow>
+        <SettingRow icon={<DataPie24Regular/>} title={t.wheelPreset} description={t.wheelPresetHelp}>
+          <Choice label={t.wheelPreset} value={wheel.id} options={wb.wheels.map(w => ({ id: w.id, name: name(w) }))} onChange={selectPreset}/>
+          <Button icon={<Add24Regular/>} aria-label={t.newWheel} onClick={() => addPreset(false)}/>
+        </SettingRow>
+        <ExpanderRow icon={<Settings24Regular/>} title={name(wheel)} control={<div className="wdButtons">
+          <Button icon={<Copy24Regular/>} onClick={() => addPreset(true)}>{t.duplicate}</Button>
+          <Button data-sfx="cancel" icon={<Delete24Regular/>} disabled={wb.wheels.length <= 1} onClick={() => remove(removePreset)}>{t.remove}</Button>
+        </div>}><div className="expPane"><div className="mateFields"><span>{t.name}</span><DraftInput key={wheel.id + 'name'} value={wheel.name} maxLength={80} onSave={v => edit({ wheels: wb.wheels.map(w => w.id === wheel.id ? { ...w, name: v } : w) })}/><span>{t.nameEn}</span><DraftInput key={wheel.id + 'en'} value={wheel.nameEn} maxLength={80} onSave={v => edit({ wheels: wb.wheels.map(w => w.id === wheel.id ? { ...w, nameEn: v } : w) })}/></div></div></ExpanderRow>
         <SettingRow icon={<DataPie24Regular/>} title={t.spokeCount} description={t.spokeCountHelp}>
           <Choice label={t.spokeCount} value={String(wheel.slotCount)}
             options={Array.from({ length: WHEEL_SLOT_LIMITS.max - WHEEL_SLOT_LIMITS.min + 1 }, (_, i) => { const n = WHEEL_SLOT_LIMITS.min + i; return { id: String(n), name: t.spokes(n) }; })}
             onChange={value => edit({ wheels: wb.wheels.map(w => w.id === wheel.id ? resizeWheel(w, Number(value)) : w) })}/>
         </SettingRow>
         <WheelEditor key={`${wheel.id}-${wheel.slotCount}`} wheel={effects} slotLabels={slotLabels.map((label, i) => wheel.slotNames[i] || label)} center="generic" centerOn={false} centerEditable={false} centerLabel={t.cancel} trigger={triggerLabel(draft.trigger, state.lang, state.platform)}
-          pool={ALL_PINGS.map(p => ({ id: p.id, name: upstream.pingNames[p.id], icon: textureUrl(p.icon) }))}
+          showTileNames={false} pool={ALL_PINGS.map(p => ({ id: p.id, name: upstream.pingNames[p.id], icon: textureUrl(p.icon) }))}
           defaults={{ wheel: ALL_PINGS.slice(0, wheel.slotCount).map(p => p.id), center: 'generic' }}
           labels={{ title: t.wheelPreview, desc: t.effectBindingHelp, poolTitle: t.originalEffects, poolDesc: t.effectPoolHelp }}
           onChange={p => { if (p.wheel) edit({ wheels: wb.wheels.map(w => w.id === wheel.id ? setWheelEffects(w, p.wheel ?? w.effects) : w) }); }}
@@ -248,10 +285,10 @@ export function SettingsApp() {
             <div><b>{slotLabels[i]}</b><span className="desc">{upstream.pingNames[effect]}</span></div>
             <div className="wdBindingControls">
               <label><span className="desc">{t.slotName}</span><DraftInput key={`${wheel.id}-${i}`} value={wheel.slotNames[i] ?? ''} maxLength={80}
-                ariaLabel={`${t.slot} ${i + 1} · ${t.slotName}`} placeholder={name(wb.actions.find(a => a.id === wheel.slots[i]) ?? { name: upstream.pingNames[effect] })}
+                ariaLabel={`${t.slot} ${i + 1} · ${t.slotName}`} placeholder={name(bindings.find(a => a.id === wheel.slots[i]) ?? { name: upstream.pingNames[effect] })}
                 onSave={value => edit({ wheels: wb.wheels.map(w => w.id === wheel.id ? { ...w, slotNames: w.slotNames.map((v, j) => i === j ? value : v) } : w) })}/></label>
               <Choice label={`${slotLabels[i]} · ${t.action}`} value={wheel.slots[i] ?? ''}
-                options={[{ id: '', name: t.empty }, ...wb.actions.map(a => ({ id: a.id, name: name(a) }))]}
+                options={[{ id: '', name: t.empty }, ...bindings.map(a => ({ id: a.id, name: a.kind === 'workflow' ? t.workflows + ' · ' + name(a) : name(a) }))]}
                 onChange={id => edit({ wheels: wb.wheels.map(w => w.id === wheel.id ? { ...w, slots: w.slots.map((v, j) => i === j ? id || null : v) } : w) })}/>
               <Button size="small" appearance="subtle" icon={<Sparkle24Regular/>} onClick={() => createAI(i)}>{t.newAIAction}</Button>
             </div>
@@ -266,18 +303,17 @@ export function SettingsApp() {
           <SwitchRow icon={<MusicNote224Regular/>} title={upstream.tickSound} checked={draft.tickSound} onChange={tickSound => changeSettings({ tickSound })}/>
         </ExpanderRow>
         <div className="section" id="actions">{t.actions}</div>
-        <SettingRow icon={<Apps24Regular/>} title={t.actions} description={t.testHint}><Choice label={t.actions} value={action?.id ?? ''} options={wb.actions.map(a => ({ id: a.id, name: name(a) }))} onChange={setActionId}/><Button icon={<Add24Regular/>} aria-label={t.newAction} onClick={() => createAI()}/></SettingRow>
-        {action && <div className="card mate wdEditor" key={action.id}><div className="mateHead"><b>{name(action)}</b><Button icon={<Play24Regular/>} onClick={() => void run(action.id)}>{t.test}</Button><Button icon={<Delete24Regular/>} onClick={() => remove(() => edit({ actions: wb.actions.filter(a => a.id !== action.id) }))}>{t.remove}</Button></div>
+        <SettingRow icon={<Apps24Regular/>} title={t.actions} description={t.actionLibraryHelp}><Choice label={t.actions} value={action?.id ?? ''} options={actions.map(a => ({ id: a.id, name: name(a) }))} onChange={setActionId}/><Button icon={<Add24Regular/>} aria-label={t.newAction} onClick={() => createAI()}/></SettingRow>
+        {action && <div className="card mate wdEditor" key={action.id}><div className="mateHead"><b>{name(action)}</b><Button icon={<Play24Regular/>} onClick={() => void run(action.id)}>{t.test}</Button><Button data-sfx="cancel" icon={<Delete24Regular/>} onClick={() => remove(() => edit({ actions: wb.actions.filter(a => a.id !== action.id) }))}>{t.remove}</Button></div>
           <EditField label={t.name}><Input value={action.name} maxLength={80} onChange={(_, d) => patchAction({ name: d.value })}/></EditField><EditField label={t.nameEn}><Input value={action.nameEn} maxLength={80} onChange={(_, d) => patchAction({ nameEn: d.value })}/></EditField>
-          <EditField label={t.type}><Choice label={t.type} value={action.kind} options={ACTION_KINDS.map(id => ({ id, name: t.kind[id] }))} onChange={kind => patchAction({ ...newAction(action.id, kind as ActionKind), name: action.name, nameEn: action.nameEn })}/></EditField>
+          <EditField label={t.type}><Choice label={t.type} value={action.kind} options={ACTION_KINDS.filter(kind => kind !== 'workflow').map(id => ({ id, name: t.kind[id] }))} onChange={kind => patchAction({ ...newAction(action.id, kind as ActionKind), name: action.name, nameEn: action.nameEn })}/></EditField>
           {action.kind === 'ai' && <EditField label={t.aiMode}><Choice label={t.aiMode} value={action.aiCustom ? 'custom' : 'direct'}
             options={[{ id: 'custom', name: t.aiCustomMode }, { id: 'direct', name: t.aiDirectMode }]}
             onChange={mode => patchAction({ aiCustom: mode === 'custom' ? { description: action.value, source: '', instruction: '', feedback: '' } : undefined })}/></EditField>}
-          <EditField label={t.input}>{source(action.input, input => patchAction({ input }), false)}</EditField>
+          {usesActionInput(action.kind) && <EditField label={t.input}>{source(action.input, input => patchAction({ input }), false)}</EditField>}
           {action.kind === 'switchWheel' ? <EditField label={t.wheels}><Choice label={t.wheels} value={action.value} options={[{ id: '', name: '—' }, ...wb.wheels.map(w => ({ id: w.id, name: name(w) }))]} onChange={value => patchAction({ value })}/></EditField>
-            : action.kind === 'workflow' ? <EditField label={t.workflows}><Choice label={t.workflows} value={action.value} options={[{ id: '', name: '—' }, ...wb.workflows]} onChange={value => patchAction({ value })}/></EditField>
             : !action.aiCustom && !['script', 'screenshot', 'readClipboard'].includes(action.kind) && <EditField label={t.value} hint={action.kind === 'ai' ? t.promptHint : action.kind === 'shortcut' ? t.shortcutHint : undefined}><Textarea value={action.value} rows={action.kind === 'ai' ? 5 : 2} maxLength={20000} onChange={(_, d) => patchAction({ value: d.value })}/></EditField>}
-          {['script', 'openApp', 'openPath'].includes(action.kind) && <><EditField label={t.windows} hint={action.kind === 'script' ? t.scriptHint : t.platformHint}><Textarea className="wdCode" value={action.windows} rows={action.kind === 'script' ? 5 : 2} maxLength={20000} onChange={(_, d) => patchAction({ windows: d.value })}/></EditField><EditField label={t.mac}><Textarea className="wdCode" value={action.mac} rows={action.kind === 'script' ? 5 : 2} maxLength={20000} onChange={(_, d) => patchAction({ mac: d.value })}/></EditField></>}
+          {(action.kind === 'script' || action.kind === 'openPath') && <><EditField label={t.windows} hint={action.kind === 'script' ? t.scriptHint : t.platformHint}><Textarea className="wdCode" value={action.windows} rows={action.kind === 'script' ? 5 : 2} maxLength={20000} onChange={(_, d) => patchAction({ windows: d.value })}/></EditField><EditField label={t.mac}><Textarea className="wdCode" value={action.mac} rows={action.kind === 'script' ? 5 : 2} maxLength={20000} onChange={(_, d) => patchAction({ mac: d.value })}/></EditField></>}
           {action.kind === 'ai' && action.aiCustom && <>
             <EditField label={t.aiDescription} hint={t.aiDescriptionHint}><Textarea aria-label={t.aiDescription} value={action.aiCustom.description} rows={4} maxLength={20000}
               onChange={(_, d) => patchCustom({ description: d.value })}/></EditField>
@@ -296,18 +332,20 @@ export function SettingsApp() {
           {['ai', 'script', 'screenshot'].includes(action.kind) && <EditField label={t.output}><Choice label={t.output} value={action.output} options={(['card', 'copy', 'paste'] as const).filter(o => action.kind !== 'screenshot' || o !== 'paste').map(id => ({ id, name: t.outputNames[id] }))} onChange={output => patchAction({ output: output as ActionDefinition['output'] })}/></EditField>}
         </div>}
         <div className="section" id="workflows">{t.workflows}</div>
-        <SettingRow icon={<ArrowSync24Regular/>} title={t.workflows} description={t.sequenceHint}><Choice label={t.workflows} value={flow?.id ?? ''} options={wb.workflows} onChange={setFlowId}/><Button icon={<Add24Regular/>} aria-label={t.newWorkflow} onClick={() => { const id = uid(); edit({ workflows: [...wb.workflows, { id, name: t.newWorkflow, steps: [] }], actions: [...wb.actions, { ...newAction(uid(), 'workflow'), name: t.newWorkflow, nameEn: t.newWorkflow, value: id }] }); setFlowId(id); }}/></SettingRow>
-        {flow ? <div className="card mate wdEditor"><div className="mateHead"><b>{flow.name}</b><Button icon={<Play24Regular/>} disabled={validateWorkflow(flow, wb).length > 0} onClick={() => { const a = wb.actions.find(a => a.kind === 'workflow' && a.value === flow.id); if (a) void run(a.id); }}>{t.test}</Button><Button icon={<Delete24Regular/>} onClick={() => remove(() => edit({ workflows: wb.workflows.filter(f => f.id !== flow.id), actions: wb.actions.filter(a => a.kind !== 'workflow' || a.value !== flow.id) }))}>{t.remove}</Button></div>
+        <SettingRow icon={<ArrowSync24Regular/>} title={t.workflows} description={t.sequenceHint}><Choice label={t.workflows} value={flow?.id ?? ''} options={wb.workflows} onChange={setFlowId}/><Button icon={<Add24Regular/>} aria-label={t.newWorkflow} onClick={() => { const id = uid(); edit({ workflows: [...wb.workflows, { id, name: t.newWorkflow, steps: [] }] }); setFlowId(id); }}/></SettingRow>
+        {flow ? <div className="card mate wdEditor"><div className="mateHead"><b>{flow.name}</b><Button icon={<Play24Regular/>} disabled={validateWorkflow(flow, wb).length > 0} onClick={() => void run(workflowBindingId(flow.id))}>{t.test}</Button><Button data-sfx="cancel" icon={<Delete24Regular/>} onClick={() => remove(() => edit({ workflows: wb.workflows.filter(f => f.id !== flow.id), actions: wb.actions.filter(a => a.kind !== 'workflow' || a.value !== flow.id) }))}>{t.remove}</Button></div>
           <EditField label={t.name}><Input value={flow.name} maxLength={80} onChange={(_, d) => patchFlow({ name: d.value })}/></EditField>
-          {flow.steps.map((s, i) => <div className="mateRule" key={s.id}><div className="mateHead"><b>{t.step} {i + 1}</b><Button size="small" disabled={i === 0} aria-label={t.up} onClick={() => { const steps = [...flow.steps]; [steps[i - 1], steps[i]] = [steps[i], steps[i - 1]]; patchFlow({ steps }); }}>↑</Button><Button size="small" disabled={i === flow.steps.length - 1} aria-label={t.down} onClick={() => { const steps = [...flow.steps]; [steps[i + 1], steps[i]] = [steps[i], steps[i + 1]]; patchFlow({ steps }); }}>↓</Button><Button size="small" aria-label={t.remove} onClick={() => patchFlow({ steps: flow.steps.filter(step => step.id !== s.id) })}>×</Button></div>
-            <EditField label={t.action}><Choice label={t.action} value={s.actionId} options={wb.actions.filter(a => a.kind !== 'workflow').map(a => ({ id: a.id, name: name(a) }))} onChange={actionId => patchFlow({ steps: flow.steps.map(step => step.id === s.id ? { ...step, actionId } : step) })}/></EditField><EditField label={t.input}>{source(s.input, input => patchFlow({ steps: flow.steps.map(step => step.id === s.id ? { ...step, input } : step) }))}</EditField>
-          </div>)}
-          <div className="wdButtons"><Button icon={<Add24Regular/>} onClick={() => { const a = wb.actions.find(a => a.kind !== 'workflow'); if (a) patchFlow({ steps: [...flow.steps, { id: uid(), actionId: a.id, input: flow.steps.length ? 'previous' : a.input }] }); }}>{t.addStep}</Button></div>
+          {flow.steps.map((s, i) => {
+            const stepAction = actions.find(a => a.id === s.actionId);
+            return <div className="mateRule" key={s.id}><div className="mateHead"><b>{t.step} {i + 1}</b><Button size="small" disabled={i === 0} aria-label={t.up} onClick={() => { const steps = [...flow.steps]; [steps[i - 1], steps[i]] = [steps[i], steps[i - 1]]; patchFlow({ steps }); }}>↑</Button><Button size="small" disabled={i === flow.steps.length - 1} aria-label={t.down} onClick={() => { const steps = [...flow.steps]; [steps[i + 1], steps[i]] = [steps[i], steps[i + 1]]; patchFlow({ steps }); }}>↓</Button><Button data-sfx="cancel" size="small" aria-label={t.remove} onClick={() => patchFlow({ steps: flow.steps.filter(step => step.id !== s.id) })}>×</Button></div>
+            <EditField label={t.action}><Choice label={t.action} value={s.actionId} options={actions.map(a => ({ id: a.id, name: name(a) }))} onChange={actionId => patchFlow({ steps: flow.steps.map(step => step.id === s.id ? { ...step, actionId } : step) })}/></EditField>{stepAction && usesActionInput(stepAction.kind, true) && <EditField label={t.input}>{source(s.input, input => patchFlow({ steps: flow.steps.map(step => step.id === s.id ? { ...step, input } : step) }))}</EditField>}
+          </div>; })}
+          <div className="wdButtons"><Button icon={<Add24Regular/>} onClick={() => { const a = actions[0]; if (a) patchFlow({ steps: [...flow.steps, { id: uid(), actionId: a.id, input: flow.steps.length ? 'previous' : a.input }] }); }}>{t.addStep}</Button></div>
           {validateWorkflow(flow, wb).map((issue, i) => <p className="wdError" key={i}>{t.step} {issue.step + 1}: {deskError(issue.code, state.lang)}</p>)}
         </div> : <div className="card notes"><div className="lbl">{t.noSteps}</div></div>}
         <div className="section" id="models">{t.models}</div>
         <SettingRow icon={<Sparkle24Regular/>} title={t.models} description={t.modelHint}><Choice disabled={pending} label={t.models} value={profile?.id ?? ''} options={wb.profiles} onChange={id => { setProfileId(id); setKey(''); resetModelStatus(); }}/><Button disabled={pending} icon={<Add24Regular/>} aria-label={t.newModel} onClick={() => { const id = uid(); edit({ profiles: [...wb.profiles, { id, name: 'OpenAI', kind: 'builtin', provider: 'openai', protocol: 'openai', baseUrl: 'https://api.openai.com/v1', model: '', tagColor: 3, tagColorCustom: null }], defaultProfileId: wb.defaultProfileId || id }); setProfileId(id); setKey(''); resetModelStatus(); }}/></SettingRow>
-        {profile ? <div className="card mate wdEditor wdModelEditor"><fieldset className="wdModelFields" disabled={pending}><div className="mateHead"><b>{profile.name}</b><Button icon={<Delete24Regular/>} disabled={pending} onClick={() => remove(() => { resetModelStatus(); setKey(''); edit({ profiles: wb.profiles.filter(p => p.id !== profile.id) }); })}>{t.remove}</Button></div>
+        {profile ? <div className="card mate wdEditor wdModelEditor"><fieldset className="wdModelFields" disabled={pending}><div className="mateHead"><b>{profile.name}</b><Button data-sfx="cancel" icon={<Delete24Regular/>} disabled={pending} onClick={() => remove(() => { resetModelStatus(); setKey(''); edit({ profiles: wb.profiles.filter(p => p.id !== profile.id) }); })}>{t.remove}</Button></div>
           <EditField label={'1 · ' + t.providerPreset} hint={t.presetHint}><Choice label={t.providerPreset} value={profile.provider} options={DESK_PROVIDERS.map(p => ({ id: p.id, name: t.providerNames[p.id as keyof typeof t.providerNames] ?? p.name }))} onChange={id => {
             if (id === profile.provider) return;
             const preset = DESK_PROVIDERS.find(p => p.id === id);
@@ -337,7 +375,7 @@ export function SettingsApp() {
               {profile.provider !== 'custom' && <EditField label={t.baseUrl} hint={t.endpointKeyHint}><Input aria-label={t.baseUrl} value={profile.baseUrl} onChange={(_, d) => patchProfile({ baseUrl: d.value })}/></EditField>}
               <EditField label={t.protocol} hint={t.protocolHint}><Choice label={t.protocol} value={profile.protocol} options={[{ id: 'openai', name: t.openaiFormat }, { id: 'anthropic', name: t.anthropicFormat }]} onChange={protocol => patchProfile({ protocol: protocol as 'openai' | 'anthropic' })}/></EditField>
               <div className="wdButtons"><Button disabled={pending || !key.trim()} onClick={() => void modelRequest('key')}>{t.saveKeyOnly}</Button>
-                <Button disabled={pending || (!state.keysUnchecked && !state.keyIds.includes(profile.id))} onClick={() => { if (window.confirm(t.clearKeyConfirm)) void modelRequest('clearKey'); }}>{t.clearKey}</Button></div>
+                <Button data-sfx="cancel" disabled={pending || (!state.keysUnchecked && !state.keyIds.includes(profile.id))} onClick={() => { if (window.confirm(t.clearKeyConfirm)) void modelRequest('clearKey'); }}>{t.clearKey}</Button></div>
             </div>
           </ExpanderRow>
         </fieldset></div> : <div className="card notes"><div className="lbl">{t.noModels}</div><Button className="wdBtnPrimary" appearance="primary" onClick={() => { const id = uid(); edit({ profiles: [{ id, name: 'OpenAI', kind: 'builtin', provider: 'openai', protocol: 'openai', baseUrl: 'https://api.openai.com/v1', model: '', tagColor: 3, tagColorCustom: null }], defaultProfileId: id }); setProfileId(id); }}>{t.newModel}</Button></div>}
@@ -352,10 +390,6 @@ export function SettingsApp() {
         <div className="wdFooterStatus">
           <span className={`wdFooterDot ${failed ? 'err' : statusKind}`}/>
           <span role="status" className={failed ? 'wdError' : 'wdFooterMsg'}>{message || statusTitle}</span>
-        </div>
-        <div className="wdFooterActions">
-          <Button disabled={aiPending} onClick={() => { const effect = effects[0] ?? 'allin'; void flush().then(ok => { if (ok) void invoke({ type: 'previewEffect', effect }); }); }}>{t.preview}</Button>
-          <Button className="wdBtnPrimary" appearance="primary" disabled={aiPending} onClick={() => void flush()}>{t.save}</Button>
         </div>
       </footer>
     </div>

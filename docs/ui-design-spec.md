@@ -82,7 +82,7 @@ WheelDesk uses **Plan A** (1:1 China-server in-game ESC menu typography — bold
   - 3-row × 2-column CSS Grid on `.app.wdSettings`:
     - Row 1 (`50px`, `grid-column: 1 / -1`): Draggable `.titlebar` with centered gold filigree wings + crest + `WHEELDESK · 选项 / OPTIONS` and right-aligned live status pill (`.wdLivePill`).
     - Row 2 (`minmax(0, 1fr)`): Left `224px` `nav.side` + Right `minmax(0, 1fr)` `main.content` (content inner `max-width: 720px`, centered).
-    - Row 3 (`54px`, `grid-column: 1 / -1`): Fixed `.wdFooterBar` with live status diamond on the left and metallic action buttons (`预览手势`, `保存修改`) on the right.
+    - Row 3 (`54px`, `grid-column: 1 / -1`): Fixed `.wdFooterBar` with live status diamond on the left; changes autosave, with a retry button in the sidebar only after a save failure.
   - Outer border: `2px solid #785a28` with inner dark groove and `rgba(200,170,110,0.34)` metallic inner hairline + 4 SVG corner ornaments (`.wdCorner.tl/tr/bl/br`).
 
 ---
@@ -156,3 +156,25 @@ WheelDesk uses **Plan A** (1:1 China-server in-game ESC menu typography — bold
 - `.weSlot`, `.weTile`, `.wdBinding`, `.wdBindings`
 - `[role="combobox"][aria-label="辐数"]`, `.wdBinding [role="combobox"]`, `input[aria-label="位置 N · 自定义名称"]`
 - Page text must never contain `lolPing` or `房间`.
+
+---
+
+## 9. UI Interaction Audio (`src/renderer/workbench/uiSounds.ts` & `assets/ui-sounds/`)
+
+WheelDesk pairs its 1:1 LOL visual UI with 10 authentic `rcp-fe-lol-uikit` OGG Vorbis interaction sound effects decoded via `SoundBank` (Web Audio API, offline from `../ui-sounds/*.ogg`, synced to global `volume` & `muted` settings):
+
+| Interaction | Sound ID | File | Notes |
+| --- | --- | --- | --- |
+| Sidebar category switch (`.navItem`) | `nav` | `sfx-nav-button-text-click.ogg` | Gain `0.65` |
+| Standard button / Expander header | `click` | `sfx-uikit-click-generic.ogg` | Gain `0.72` |
+| Primary Hextech confirm (`.wdBtnPrimary`, `button.primary`) | `confirm` | `sfx-uikit-button-gold-click.ogg` | Gain `0.75` |
+| Square checkbox toggle (`.fui-Switch__input`) | `checkbox` | `sfx-uikit-checkbox-click.ogg` | Gain `0.80` |
+| Dropdown / Combobox open | `dropdownOpen` | `sfx-uikit-dropdown-click.ogg` | Gain `0.70` |
+| Dropdown / Combobox option select | `dropdownSelect` | `sfx-uikit-dropdown-select.ogg` | Gain `0.75` (portal delegated) |
+| Hover tick / Slider drag tick | `hover` | `sfx-uikit-grid-hover.ogg` | `0.06s`, gain `0.40`, throttled `70ms` |
+| Wheel slot click / drop (`.weSlot`) | `slot` | `sfx-uikit-framed-icon-click.ogg` | Gain `0.70` (skip `.weTile` click to avoid layering over ping preview) |
+| Delete / Cancel / Close (`[data-sfx="cancel"]`, `.icon-button`) | `cancel` | `sfx-uikit-button-circlex-click.ogg` | Gain `0.75` |
+| Model test OK / AI understanding ready / Result completed | `success` | `sfx-uikit-reward-toast.ogg` | Gain `0.65` |
+
+Keep `assets/sounds/` strictly limited to the 12 original ping `.wav` files required by `tools/smoke.cjs`; all UI interaction audio lives under `assets/ui-sounds/`.
+

@@ -8,6 +8,7 @@ import { deskText, deskError } from '../../shared/i18n';
 import { Icon } from './Wheel';
 import { Overlay } from './Overlay';
 import { SettingsApp } from './Settings';
+import { playUiSound, preloadUiSounds, setUiAudioSettings } from './uiSounds';
 import './style.css';
 declare global { interface Window { desk: DeskApi } }
 const uid = () => crypto.randomUUID();
@@ -28,8 +29,16 @@ function App() {
   const [inputText, setInputText] = useState('');
   const [modelIds, setModelIds] = useState<string[]>([]);
   const [pending, setPending] = useState(false);
+  const previousRunStatus = useRef<DeskState['run']['status'] | null>(null);
   useEffect(() => {
-    const receive = (s: DeskState) => { setState(s); if (!dirty.current) setDraft(structuredClone(s.settings)); };
+    preloadUiSounds();
+    const receive = (s: DeskState) => {
+      setUiAudioSettings(s.settings);
+      if (previousRunStatus.current === 'running' && s.run.status === 'completed') playUiSound('success');
+      previousRunStatus.current = s.run.status;
+      setState(s);
+      if (!dirty.current) setDraft(structuredClone(s.settings));
+    };
     void window.desk.invoke({ type: 'state' }).then(r => { if (r.state) receive(r.state); });
     return window.desk.onState(receive);
   }, []);
@@ -58,12 +67,12 @@ function App() {
     const r = state.run;
     const running = r.status === 'running' || r.status === 'input';
     return <main className="result-card">
-      <header className="result-header"><span className="brand-mark"><Icon kind="ai"/></span><b>{r.name || t.result}</b><button className="icon-button" title={t.close} onClick={() => void invoke({ type: 'close' })}>×</button></header>
+      <header className="result-header"><span className="brand-mark"><Icon kind="ai"/></span><b>{r.name || t.result}</b><button className="icon-button" title={t.close} onClick={() => { playUiSound('cancel'); void invoke({ type: 'close' }); }}>×</button></header>
       <div className="result-status"><span className={running ? 'pulse' : 'status-dot'}/>{r.status === 'input' ? t.askInput : t[r.status]}<span>{r.total > 0 ? `${r.step} / ${r.total}` : ''}</span></div>
-      {r.status === 'input' ? <><p className="muted">{t.inputHint}</p><textarea className="input-box" value={inputText} onChange={e => setInputText(e.target.value)} autoFocus/><div className="toolbar"><button onClick={() => void invoke({ type: 'input', clipboard: true })}>{t.useClipboard}</button><button className="primary" onClick={() => void invoke({ type: 'input', text: inputText }).then(reply => { if (reply.ok) setInputText(''); })}>{t.continue}</button></div></>
+      {r.status === 'input' ? <><p className="muted">{t.inputHint}</p><textarea className="input-box" value={inputText} onChange={e => setInputText(e.target.value)} autoFocus/><div className="toolbar"><button onClick={() => { playUiSound('click'); void invoke({ type: 'input', clipboard: true }); }}>{t.useClipboard}</button><button className="primary" onClick={() => { playUiSound('confirm'); void invoke({ type: 'input', text: inputText }).then(reply => { if (reply.ok) setInputText(''); }); }}>{t.continue}</button></div></>
         : <div className="result-content">{r.image && <img src={r.image} alt={t.result}/>}<div className="answer">{r.text}</div>{r.error && <div className="error-box">{deskError(r.error, state.lang)}</div>}{!r.text && !r.image && running && <div className="thinking"><i/><i/><i/></div>}</div>}
       {message && <div role="status" className={isError ? 'message error' : 'message'}>{message}</div>}
-      <footer className="result-footer">{running ? <button onClick={() => void invoke({ type: 'cancel' })}>{t.cancel}</button> : <><button disabled={!r.text && !r.image} onClick={() => void invoke({ type: 'copy' }).then(reply => { if (reply.ok) notice(t.copied); })}>{t.copy}</button><button className="primary" disabled={!r.text} onClick={() => void invoke({ type: 'paste' })}>{t.paste}</button></>}<small>{r.inputTokens + r.outputTokens > 0 ? `${r.inputTokens + r.outputTokens} tokens` : 'WheelDesk'}</small></footer>
+      <footer className="result-footer">{running ? <button onClick={() => { playUiSound('cancel'); void invoke({ type: 'cancel' }); }}>{t.cancel}</button> : <><button disabled={!r.text && !r.image} onClick={() => { playUiSound('click'); void invoke({ type: 'copy' }).then(reply => { if (reply.ok) notice(t.copied); }); }}>{t.copy}</button><button className="primary" disabled={!r.text} onClick={() => { playUiSound('confirm'); void invoke({ type: 'paste' }); }}>{t.paste}</button></>}<small>{r.inputTokens + r.outputTokens > 0 ? `${r.inputTokens + r.outputTokens} tokens` : 'WheelDesk'}</small></footer>
     </main>;
   }
   return null;
