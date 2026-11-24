@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { defaultWorkbench, newAction, normalizeWorkbench, parseShortcut, resizeWheel, setWheelEffects, slotBindableActions, validateWorkflow } from '../../src/shared/actions';
+import { defaultWorkbench, exportWheelBundle, importWheelBundle, newAction, normalizeWorkbench, parseShortcut, resizeWheel, setWheelEffects, slotBindableActions, validateWorkflow } from '../../src/shared/actions';
 import { DEFAULT_WHEEL } from '../../src/shared/pings';
 
 describe('workbench configuration', () => {
@@ -170,6 +170,34 @@ describe('workbench configuration', () => {
     expect(s.wheels[0].effects.length).toBeGreaterThanOrEqual(Number(count));
     expect(s.wheels[0].effects.length).toBe(s.wheels[0].slots.length);
     expect(s.wheels[0].slots.slice(0, 8)).toEqual(wb.wheels[0].slots);
+  });
+  it('exports and imports a wheel preset without profiles or ID collisions', () => {
+    const wb = defaultWorkbench();
+    wb.profiles.push({
+      id: 'secret-profile', name: 'Private', kind: 'builtin', provider: 'openai',
+      protocol: 'openai', baseUrl: 'https://private.example/v1', model: 'gpt-4o', tagColor: 3, tagColorCustom: null,
+    });
+    wb.actions = wb.actions.map(a => a.kind === 'ai' ? { ...a, profileId: 'secret-profile' } : a);
+    wb.workflows.push({ id: 'wf1', name: 'OCR Flow', steps: [{ id: 's1', actionId: 'capture', input: 'none' }, { id: 's2', actionId: 'ocr', input: 'previous' }] });
+    wb.wheels[0].slots[0] = 'workflow:wf1';
+
+    const bundle = exportWheelBundle(wb, 'tools');
+    expect(bundle).not.toBeNull();
+    expect(JSON.stringify(bundle)).not.toContain('secret-profile');
+    expect(JSON.stringify(bundle)).not.toContain('private.example');
+    expect(bundle?.workflows.map(w => w.id)).toEqual(['wf1']);
+    expect(bundle?.actions.every(a => a.profileId === '')).toBe(true);
+
+    const imported = importWheelBundle(wb, bundle);
+    expect(imported).not.toBeNull();
+    expect(imported?.wheelId).not.toBe('tools');
+    expect(imported?.settings.wheels).toHaveLength(3);
+    expect(imported?.settings.activeWheelId).toBe(imported?.wheelId);
+    expect(imported?.settings.profiles).toEqual(wb.profiles);
+    expect(imported?.settings.workflows).toHaveLength(2);
+    const addedWheel = imported?.settings.wheels.find(w => w.id === imported.wheelId);
+    expect(addedWheel?.slots[0]).toMatch(/^workflow:wf1_/);
+    expect(importWheelBundle(wb, { format: 'wrong', version: 1 })).toBeNull();
   });
 });
 describe('workflow validation', () => {

@@ -118,3 +118,7 @@ Settings normalization maps the legacy openApp kind to openPath while preserving
 ## Action library guidance and effect palette (0.1.18)
 
 Inspected the macOS Electron wheel editor. All 12 effect tiles have accessible labels and display only their icons and any assigned position badges. The real action library row explains creating and editing actions. The full simulated-gesture smoke suite, typecheck, production build, native helper tests and JavaScript regression suite passed. Verified the signed macOS installer checksum.
+
+## Result Markdown, follow-up, preset sharing & showcase README (0.1.19)
+
+Added sanitized Markdown rendering with one-click code-block copy and in-card AI follow-up turns in `ResultView.tsx`, plus secret-free `.wheeldesk.json` wheel preset export/import with automatic ID collision remapping. Captured fresh real-app screenshots (`docs/images/`) and updated both English and Simplified Chinese READMEs. `npm run typecheck`, `npm test` (140 files / 2,182 passed, 5 skipped), `npm run build`, and `WHEELDESK_SMOKE_GESTURES=1 npm run smoke` passed with zero renderer errors. Windows installer built via GitHub Actions `windows-latest` runner; interactive Windows desktop acceptance remains pending.

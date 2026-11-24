@@ -1,6 +1,6 @@
-import { app, BrowserWindow, ClipboardItem, clipboard, ipcMain, Menu, nativeImage, safeStorage, screen, shell, systemPreferences, Tray } from 'electron';
+import { app, BrowserWindow, ClipboardItem, clipboard, dialog, ipcMain, Menu, nativeImage, safeStorage, screen, shell, systemPreferences, Tray } from 'electron';
 import { join } from 'node:path';
-import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { setTimeout as wait } from 'node:timers/promises';
 import { SettingsStore } from './settingsStore';
@@ -9,12 +9,12 @@ import { InputBridge } from './inputBridge';
 import { configCommand, type HelperEvent } from '../shared/protocol';
 import { deskError, deskText, resolveLang } from '../shared/i18n';
 import { normalizeSettings, type Settings } from '../shared/settings';
-import { hasPreparedInstruction, normalizeWorkbench, parseShortcut, type ActionDefinition, type ActionValue, type InputSource } from '../shared/actions';
+import { exportWheelBundle, hasPreparedInstruction, importWheelBundle, normalizeWorkbench, parseShortcut, type ActionDefinition, type ActionValue, type InputSource, type RunTurn } from '../shared/actions';
 import { DESK_CH, type DeskReply, type DeskState, type Point } from '../shared/ipc';
 import { ContextClient } from './teammate/contextClient';
 import { DeskCredentials } from './workbench/credentials';
 import { createAdapter } from './teammate/providers';
-import { ProviderError, type Part } from './teammate/providers/types';
+import { ProviderError, type Part, type Turn } from './teammate/providers/types';
 import { ActionRunner, type ExecutionContext, type RunTarget } from './workbench/runner';
 import { runScript } from './workbench/scripts';
 import { DesktopSurfaces, deskWindow, loadDesk } from './workbench/surfaces';
@@ -49,14 +49,17 @@ let requestedInput: { resolve: (text: string) => void; reject: (error: Error) =>
 let starting = false;
 let preparation: AbortController | null = null;
 let cardReady: Promise<void> | null = null;
+let aiSession: { profileId: string; system: string; turns: Turn[]; timeoutS: number } | null = null;
+let followUpController: AbortController | null = null;
 const helperPath = (name: string) => app.isPackaged ? mac ? join(process.resourcesPath, '../Helpers', name) : join(process.resourcesPath, name + '.exe')
   : join(app.getAppPath(), 'native/hook-helper/build', name + (mac ? '' : '.exe'));
 const language = () => resolveLang(store.get().language, app.getLocale());
 const t = () => deskText(language());
 const label = (a: { name: string; nameEn?: string }) => language() === 'en' ? a.nameEn || a.name : a.name;
 function state(): DeskState {
+  const baseRun = requestedInput ? { ...runner.state, status: 'input' as const } : runner.state;
   return { settings: store.get(), lang: language(), platform, helper: bridge.status,
-    run: requestedInput ? { ...runner.state, status: 'input' } : runner.state,
+    run: { ...baseRun, canFollowUp: Boolean(aiSession && !runner.busy && !followUpController) },
     ...secrets.status() };
 }
 function broadcast(): void {
@@ -260,6 +263,12 @@ async function execute(action: ActionDefinition, value: ActionValue, ctx: Execut
           tools: [], model: profile.model }, { accepted: () => undefined, text: ctx.delta,
           usage: u => ctx.usage(u.input, u.output) }, ctx.signal);
         output = { text: answer.text };
+        aiSession = {
+          profileId: profile.id,
+          system: instruction,
+          turns: [{ role: 'user', parts }, { role: 'assistant', text: answer.text, calls: [] }],
+          timeoutS: action.timeoutS,
+        };
       } catch (error) {
         if (ctx.signal.aborted) throw new Error(ctx.signal.reason?.name === 'TimeoutError' ? 'timeout' : 'cancelled');
         if (error instanceof ProviderError) throw new Error(['auth', 'rate', 'network', 'images'].includes(error.kind) ? error.kind : 'provider');
@@ -277,7 +286,8 @@ async function execute(action: ActionDefinition, value: ActionValue, ctx: Execut
   return output;
 }
 async function start(id: string, point?: Point, prepared?: Promise<RunTarget>): Promise<void> {
-  if (runner.busy || starting || preparation) throw new Error('busy');
+  if (runner.busy || followUpController || starting || preparation) throw new Error('busy');
+  aiSession = null;
   starting = true;
   try {
     if (!point) {
@@ -356,7 +366,134 @@ async function handle(sender: Electron.WebContents, raw: unknown): Promise<DeskR
       return { ok: true, state: state() };
     }
     case 'cancelPrepareAI': if (!isSettings) return { ok: false }; preparation?.abort(); return { ok: true };
-    case 'cancel': runner.cancel(); return { ok: true };
+    case 'cancel': runner.cancel(); followUpController?.abort(); return { ok: true };
+    case 'focusResult': {
+      if (!isResult || !resultWindow || resultWindow.isDestroyed()) return { ok: false };
+      resultWindow.setFocusable(true);
+      resultWindow.focus();
+      return { ok: true };
+    }
+    case 'copyText': {
+      if (!isResult || typeof raw.text !== 'string' || raw.text.length > 200_000) return { ok: false };
+      await clipboard.writeText(raw.text);
+      return { ok: true };
+    }
+    case 'followUp': {
+      if (!isResult || typeof raw.text !== 'string') return { ok: false };
+      const question = raw.text.trim().slice(0, 20000);
+      if (!question) throw new Error('emptyInput');
+      if (runner.busy || followUpController || starting || preparation) throw new Error('busy');
+      if (!aiSession) throw new Error('noSession');
+      const session = aiSession;
+      const wb = store.get().workbench;
+      const profile = wb.profiles.find(p => p.id === session.profileId)
+        ?? wb.profiles.find(p => p.id === wb.defaultProfileId)
+        ?? wb.profiles[0];
+      if (!profile) throw new Error('modelMissing');
+      const key = secrets.key(profile.id) ?? '';
+      const priorHistory: RunTurn[] = [...(runner.state.history ?? [])];
+      if (runner.state.text) priorHistory.push({ role: 'assistant', text: runner.state.text });
+      priorHistory.push({ role: 'user', text: question });
+      const nextTurns: Turn[] = [...session.turns, { role: 'user', parts: [{ text: question }] }];
+      const controller = new AbortController();
+      followUpController = controller;
+      const signal = AbortSignal.any([controller.signal, AbortSignal.timeout(session.timeoutS * 1000)]);
+      runner.state = { ...runner.state, status: 'running', text: '', error: '', history: priorHistory };
+      broadcast();
+      try {
+        const answer = await createAdapter(profile, key).turn(
+          { system: session.system, turns: nextTurns, tools: [], model: profile.model },
+          {
+            accepted: () => undefined,
+            text: delta => {
+              if (!signal.aborted) {
+                runner.state = { ...runner.state, text: runner.state.text + delta };
+                broadcast();
+              }
+            },
+            usage: u => {
+              runner.state = {
+                ...runner.state,
+                inputTokens: runner.state.inputTokens + u.input,
+                outputTokens: runner.state.outputTokens + u.output,
+              };
+              broadcast();
+            },
+          },
+          signal,
+        );
+        signal.throwIfAborted();
+        session.turns = [...nextTurns, { role: 'assistant', text: answer.text, calls: [] }];
+        runner.state = { ...runner.state, status: 'completed', text: answer.text, error: '' };
+        broadcast();
+        return { ok: true };
+      } catch (error) {
+        const cancelled = controller.signal.aborted;
+        const code = cancelled
+          ? ''
+          : signal.aborted
+            ? 'timeout'
+            : error instanceof ProviderError && ['auth', 'rate', 'network', 'images'].includes(error.kind)
+              ? error.kind
+              : error instanceof ProviderError
+                ? 'provider'
+                : 'network';
+        runner.state = {
+          ...runner.state,
+          status: cancelled ? 'cancelled' : 'failed',
+          error: code ? deskError(code, language()) : '',
+        };
+        broadcast();
+        return { ok: false, error: code ? deskError(code, language()) : undefined };
+      } finally {
+        if (followUpController === controller) followUpController = null;
+        broadcast();
+      }
+    }
+    case 'exportWheel': {
+      if (!isSettings || typeof raw.wheelId !== 'string') return { ok: false };
+      const bundle = exportWheelBundle(store.get().workbench, raw.wheelId);
+      if (!bundle) throw new Error('missing');
+      const safeName = (label(bundle.wheel) || 'wheel').replace(/[^\w\u4e00-\u9fff-]+/g, '_').slice(0, 48) || 'wheel';
+      const picked = settingsWindow && !settingsWindow.isDestroyed()
+        ? await dialog.showSaveDialog(settingsWindow, {
+          defaultPath: `${safeName}.wheeldesk.json`,
+          filters: [{ name: 'WheelDesk Preset', extensions: ['json'] }],
+        })
+        : await dialog.showSaveDialog({
+          defaultPath: `${safeName}.wheeldesk.json`,
+          filters: [{ name: 'WheelDesk Preset', extensions: ['json'] }],
+        });
+      if (picked.canceled || !picked.filePath) return { ok: true, cancelled: true };
+      await writeFile(picked.filePath, JSON.stringify(bundle, null, 2) + '\n', 'utf8');
+      return { ok: true };
+    }
+    case 'importWheel': {
+      if (!isSettings) return { ok: false };
+      const picked = settingsWindow && !settingsWindow.isDestroyed()
+        ? await dialog.showOpenDialog(settingsWindow, {
+          properties: ['openFile'],
+          filters: [{ name: 'WheelDesk Preset', extensions: ['json'] }],
+        })
+        : await dialog.showOpenDialog({
+          properties: ['openFile'],
+          filters: [{ name: 'WheelDesk Preset', extensions: ['json'] }],
+        });
+      if (picked.canceled || !picked.filePaths[0]) return { ok: true, cancelled: true };
+      const filePath = picked.filePaths[0];
+      const info = await stat(filePath);
+      if (info.size > 2 * 1024 * 1024) throw new Error('invalidPreset');
+      let parsed: unknown;
+      try { parsed = JSON.parse(await readFile(filePath, 'utf8')); }
+      catch { throw new Error('invalidPreset'); }
+      const imported = importWheelBundle(store.get().workbench, parsed);
+      if (!imported) throw new Error('invalidPreset');
+      const problems = store.problems.length;
+      store.update({ workbench: imported.settings });
+      await store.flush();
+      if (store.problems.length > problems) throw new Error('saveFailed');
+      return { ok: true, wheelId: imported.wheelId, state: state() };
+    }
     case 'key': {
       if (!isSettings || typeof raw.id !== 'string' || typeof raw.key !== 'string' || raw.key.length > 8192
         || !store.get().workbench.profiles.some(p => p.id === raw.id)) return { ok: false };
@@ -383,11 +520,16 @@ async function handle(sender: Electron.WebContents, raw: unknown): Promise<DeskR
     case 'copy': if (runner.state.image) await clipboard.write([new ClipboardItem({ 'image/png': new Blob([new Uint8Array(nativeImage.createFromDataURL(runner.state.image).toPNG())], { type: 'image/png' }) })]);
       else await clipboard.writeText(runner.state.text); return { ok: true };
     case 'paste': {
-      if (!isResult || runner.busy) return { ok: false };
-      // The result window is non-activating, so the target remains in front.
+      if (!isResult || runner.busy || followUpController) return { ok: false };
+      // If the user focused the card to type a follow-up, return focus to the target app before filling.
+      if (resultWindow?.isFocused()) {
+        resultWindow.hide();
+        if (mac) app.hide();
+        await wait(140);
+      }
       await fill(runner.state.text, target, AbortSignal.timeout(8000)); return { ok: true };
     }
-    case 'close': if (isResult) { if (requestedInput) runner.cancel(); resultWindow?.hide(); } return { ok: true };
+    case 'close': if (isResult) { if (requestedInput || followUpController) { runner.cancel(); followUpController?.abort(); } resultWindow?.hide(); } return { ok: true };
     case 'retry': if (isSettings) bridge.retry(); return { ok: true };
     case 'accessibility': if (isSettings && mac) {
       systemPreferences.isTrustedAccessibilityClient(true);
@@ -407,7 +549,7 @@ app.on('before-quit', event => {
   if (quitting || !bridge) return;
   event.preventDefault(); quitting = true;
   permissionRecovery?.dispose();
-  runner.cancel(); preparation?.abort(); surfaces.destroy();
+  runner.cancel(); followUpController?.abort(); preparation?.abort(); surfaces.destroy();
   void Promise.all([bridge.stop(), context.stop(), store.flush()]).finally(() => app.quit());
 });
 void app.whenReady().then(async () => {

@@ -46,6 +46,7 @@ export interface WorkbenchSettings {
   defaultProfileId: string;
 }
 export interface ActionValue { text?: string; image?: { mime: 'image/jpeg'; data: string } }
+export interface RunTurn { role: 'user' | 'assistant'; text: string }
 export interface RunState {
   id: string;
   name: string;
@@ -57,6 +58,8 @@ export interface RunState {
   image?: string;
   inputTokens: number;
   outputTokens: number;
+  canFollowUp?: boolean;
+  history?: RunTurn[];
 }
 export const idleRun = (): RunState => ({ id: '', name: '', status: 'idle', step: 0, total: 0,
   text: '', error: '', inputTokens: 0, outputTokens: 0 });
@@ -227,6 +230,112 @@ export function normalizeWorkbench(raw: unknown): WorkbenchSettings {
   return { version: 1, actions, wheels, workflows, profiles,
     activeWheelId: wheels.some(w => w.id === raw.activeWheelId) ? String(raw.activeWheelId) : wheels[0].id,
     defaultProfileId: profiles.some(p => p.id === raw.defaultProfileId) ? String(raw.defaultProfileId) : profiles[0]?.id ?? '' };
+}
+
+export interface WheelPresetBundle {
+  format: 'wheeldesk-preset';
+  version: 1;
+  wheel: WheelProfile;
+  actions: ActionDefinition[];
+  workflows: WorkflowDefinition[];
+}
+
+/** Exports one wheel preset with its referenced actions and workflows; model profiles and secrets are never included. */
+export function exportWheelBundle(settings: WorkbenchSettings, wheelId: string): WheelPresetBundle | null {
+  const wheel = settings.wheels.find(w => w.id === wheelId);
+  if (!wheel) return null;
+  const workflowIds = new Set<string>();
+  const actionIds = new Set<string>();
+  for (const slot of wheel.slots) {
+    if (!slot) continue;
+    if (slot.startsWith('workflow:')) workflowIds.add(slot.slice('workflow:'.length));
+    else actionIds.add(slot);
+  }
+  const workflows = settings.workflows.filter(f => workflowIds.has(f.id)).map(f => structuredClone(f));
+  for (const flow of workflows) {
+    for (const step of flow.steps) actionIds.add(step.actionId);
+  }
+  const actions = settings.actions
+    .filter(a => a.kind !== 'workflow' && actionIds.has(a.id))
+    .map(a => ({ ...structuredClone(a), profileId: '' }));
+  return { format: 'wheeldesk-preset', version: 1, wheel: structuredClone(wheel), actions, workflows };
+}
+
+function uniqueId(base: string, used: Set<string>): string {
+  const clean = idOf(base) || 'imported';
+  if (!used.has(clean)) { used.add(clean); return clean; }
+  for (let n = 2; n < 10000; n++) {
+    const candidate = `${clean.slice(0, 72)}_${n}`;
+    if (!used.has(candidate)) { used.add(candidate); return candidate; }
+  }
+  const fallback = `imp_${Date.now()}`;
+  used.add(fallback);
+  return fallback;
+}
+
+/** Validates and merges a shared preset bundle without touching existing profiles, secrets, or colliding IDs. */
+export function importWheelBundle(
+  settings: WorkbenchSettings,
+  raw: unknown,
+): { settings: WorkbenchSettings; wheelId: string; addedActions: number; addedWorkflows: number } | null {
+  if (!obj(raw) || raw.format !== 'wheeldesk-preset' || raw.version !== 1 || !obj(raw.wheel)) return null;
+  const normalized = normalizeWorkbench({
+    version: 1,
+    wheels: [raw.wheel],
+    actions: Array.isArray(raw.actions) ? raw.actions : [],
+    workflows: Array.isArray(raw.workflows) ? raw.workflows : [],
+    profiles: [],
+  });
+  const importedWheel = normalized.wheels[0];
+  if (!importedWheel) return null;
+
+  const usedWheelIds = new Set(settings.wheels.map(w => w.id));
+  const usedActionIds = new Set(settings.actions.map(a => a.id));
+  const usedWorkflowIds = new Set(settings.workflows.map(f => f.id));
+
+  const actionMap = new Map<string, string>();
+  const addedActions: ActionDefinition[] = [];
+  for (const action of normalized.actions) {
+    if (action.kind === 'workflow') continue;
+    const nextId = uniqueId(action.id, usedActionIds);
+    actionMap.set(action.id, nextId);
+    addedActions.push({ ...action, id: nextId, profileId: '' });
+  }
+
+  const workflowMap = new Map<string, string>();
+  const addedWorkflows: WorkflowDefinition[] = [];
+  for (const flow of normalized.workflows) {
+    const nextId = uniqueId(flow.id, usedWorkflowIds);
+    workflowMap.set(flow.id, nextId);
+    addedWorkflows.push({
+      ...flow,
+      id: nextId,
+      steps: flow.steps.map(step => ({ ...step, actionId: actionMap.get(step.actionId) ?? step.actionId })),
+    });
+  }
+
+  const wheelId = uniqueId(importedWheel.id, usedWheelIds);
+  const wheel: WheelProfile = {
+    ...importedWheel,
+    id: wheelId,
+    slots: importedWheel.slots.map(slot => {
+      if (!slot) return null;
+      if (slot.startsWith('workflow:')) {
+        const mapped = workflowMap.get(slot.slice('workflow:'.length));
+        return mapped ? workflowBindingId(mapped) : null;
+      }
+      return actionMap.get(slot) ?? null;
+    }),
+  };
+
+  const merged = normalizeWorkbench({
+    ...settings,
+    activeWheelId: wheelId,
+    wheels: [...settings.wheels, wheel],
+    actions: [...settings.actions, ...addedActions],
+    workflows: [...settings.workflows, ...addedWorkflows],
+  });
+  return { settings: merged, wheelId, addedActions: addedActions.length, addedWorkflows: addedWorkflows.length };
 }
 
 export type WorkflowIssue = { step: number; code: 'missing' | 'nested' | 'image' | 'previous' | 'empty' };

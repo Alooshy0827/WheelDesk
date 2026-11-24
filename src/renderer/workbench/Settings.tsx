@@ -1,5 +1,5 @@
 import { Button, Combobox, Dropdown, FluentProvider, Input, Option, Textarea, motionTokens } from '@fluentui/react-components';
-import { Add24Regular, Apps24Regular, ArrowSync24Regular, Copy24Regular, Cursor24Regular, DataPie24Regular, Delete24Regular, Info24Regular, LocalLanguage24Regular, Play24Regular, Rocket24Regular, Settings24Regular, ShieldKeyhole24Regular, Sparkle24Regular, ResizeLarge24Regular, Timer24Regular, Speaker224Regular, SpeakerMute24Regular, MusicNote224Regular } from '@fluentui/react-icons';
+import { Add24Regular, Apps24Regular, ArrowDownload24Regular, ArrowSync24Regular, ArrowUpload24Regular, Copy24Regular, Cursor24Regular, DataPie24Regular, Delete24Regular, Info24Regular, LocalLanguage24Regular, Play24Regular, Rocket24Regular, Settings24Regular, ShieldKeyhole24Regular, Sparkle24Regular, ResizeLarge24Regular, Timer24Regular, Speaker224Regular, SpeakerMute24Regular, MusicNote224Regular } from '@fluentui/react-icons';
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import type { DeskCommand, DeskReply, DeskState } from '../../shared/ipc';
 import { ACTION_KINDS, INPUT_SOURCES, hasPreparedInstruction, slotBindableActions, usesActionInput, wheelBindings, workflowBindingId, newAction, resizeWheel, setWheelEffects, validateWorkflow, type ActionDefinition, type ActionKind, type InputSource, type WorkbenchSettings } from '../../shared/actions';
@@ -145,6 +145,24 @@ export function SettingsApp() {
     const remaining = wb.wheels.filter(w => w.id !== wheel.id);
     if (remaining.length) selectPreset(remaining[0].id, remaining);
   };
+  const exportPreset = async () => {
+    if (!await flush()) return;
+    const reply = await invoke({ type: 'exportWheel', wheelId: wheel.id });
+    if (reply.ok && !reply.cancelled) {
+      notice(t.presetExported);
+      playUiSound('success');
+    }
+  };
+  const importPreset = async () => {
+    if (!await flush()) return;
+    const reply = await invoke({ type: 'importWheel' });
+    if (reply.ok && !reply.cancelled && reply.state) {
+      draftRef.current = structuredClone(reply.state.settings);
+      setDraft(draftRef.current);
+      notice(t.presetImported);
+      playUiSound('success');
+    }
+  };
   const effects = wheel.effects.slice(0, wheel.slotCount);
   const slotLabels = effects.map((_, i) => wheel.slotCount === 8 ? upstream.slotNames[i] : `${t.slot} ${i + 1}`);
   const actions = wb.actions.filter(a => a.kind !== 'workflow');
@@ -265,6 +283,8 @@ export function SettingsApp() {
           <Button icon={<Add24Regular/>} aria-label={t.newWheel} onClick={() => addPreset(false)}/>
         </SettingRow>
         <ExpanderRow icon={<Settings24Regular/>} title={name(wheel)} control={<div className="wdButtons">
+          <Button icon={<ArrowUpload24Regular/>} onClick={() => void exportPreset()}>{t.exportPreset}</Button>
+          <Button icon={<ArrowDownload24Regular/>} onClick={() => void importPreset()}>{t.importPreset}</Button>
           <Button icon={<Copy24Regular/>} onClick={() => addPreset(true)}>{t.duplicate}</Button>
           <Button data-sfx="cancel" icon={<Delete24Regular/>} disabled={wb.wheels.length <= 1} onClick={() => remove(removePreset)}>{t.remove}</Button>
         </div>}><div className="expPane"><div className="mateFields"><span>{t.name}</span><DraftInput key={wheel.id + 'name'} value={wheel.name} maxLength={80} onSave={v => edit({ wheels: wb.wheels.map(w => w.id === wheel.id ? { ...w, name: v } : w) })}/><span>{t.nameEn}</span><DraftInput key={wheel.id + 'en'} value={wheel.nameEn} maxLength={80} onSave={v => edit({ wheels: wb.wheels.map(w => w.id === wheel.id ? { ...w, nameEn: v } : w) })}/></div></div></ExpanderRow>

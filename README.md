@@ -1,47 +1,54 @@
 # WheelDesk
 
-[简体中文](README.zh-CN.md) · Internal beta 0.1.18
+[简体中文](README.zh-CN.md) · [Download Latest Release](https://github.com/Alooshy0827/WheelDesk/releases) · `v0.1.19`
 
-A desktop action wheel for everyday tools, AI instructions, and local workflows. Hold Alt (Option on macOS) and press the left mouse button to show the wheel immediately. Move to an action and release the mouse button. Move back into the center, press Escape, or right-click to cancel.
+A desktop action wheel styled 1:1 after the **League of Legends in-game Options & Smart Ping Wheel** for everyday system actions, bring-your-own-key AI instructions, and local workflows. Hold `Alt` (`Option` on macOS) and press the left mouse button to open the wheel immediately; flick to a slot and release to run; return to center, press `Esc`, or right-click to cancel.
 
-Based on [lolPing](https://github.com/darrenprx/lolPing), revision `c97fe772b98514b83f011ee540601faabd066d23`. The MIT license and original attribution are preserved. The original ping-wheel textures, sounds and animation code are reused; their separate Riot Games attribution remains in LICENSE and NOTICE.md. Emotes and room features are not included.
+Based on [lolPing](https://github.com/darrenprx/lolPing) (`c97fe772b98514b83f011ee540601faabd066d23`). The MIT source license and original attribution are preserved; the separate Riot Games media attribution remains in [LICENSE](LICENSE) and [NOTICE.md](NOTICE.md). Emotes and room features are not included.
 
-## Features
+---
 
-The settings UI is modified directly from lolPing: its Fluent controls, platform themes, scroll navigation, grouped rows and drag-and-drop wheel editor are reused.
+## Screenshots
 
-- Original wheel visuals and effects: hover glow/scale, expanding rings, pop/bobbing and All In collision, with original sounds. Each effect is paired with an independent custom function; previewing effects runs no function.
-- Multiple editable wheels with 2–12 spokes each (default 8). Shrinking hides the last slots and expanding restores their bindings; switch in the tray or with a wheel action.
-- Use **Open an app, file, or folder** for local paths, with optional platform-specific paths. Existing actions keep their wheel and workflow bindings. Other actions include opening URLs, sending keyboard shortcuts, clipboard operations and region screenshots.
-- OpenAI-compatible and Anthropic APIs, including local endpoints. Choose a model and instruction per action.
-- Streamed answer cards with copy and guarded fill-back. Text actions do not automatically send screenshots.
-- Linear workflows with explicit inputs and previous-step outputs. Shell on macOS and PowerShell on Windows receive input on stdin.
-- One active run, cancellation, per-action timeouts and a 1 MB script-output limit.
-- English and Simplified Chinese settings, encrypted API keys, optional login startup.
+| 1:1 League In-Game Wheel Editor | Desktop Smart Ping Wheel Overlay (2–12 Spokes) |
+| :---: | :---: |
+| ![Wheel Editor & Original Effects](docs/images/settings-wheel.png) | ![Overlay Wheel](docs/images/overlay-wheel.png) |
 
-## Install and use
+| In-Game Options Shell (Preset Export / Import) | Hextech AI Result Modal (Markdown · Code Copy · Follow-Up) |
+| :---: | :---: |
+| ![Settings Overview](docs/images/settings-home.png) | ![Hextech Result Modal](docs/images/result-markdown.png) |
 
-The current delivery targets macOS 13+ on Apple Silicon. Windows 11 x64 source and native build workflow are included; a Windows installer is deferred.
+---
 
-Open the DMG and drag WheelDesk to Applications. This internal build uses a persistent signing certificate and is not notarized. If macOS blocks it, use System Settings → Privacy & Security → Open Anyway for this application.
+## Highlights
 
-1. Open WheelDesk. In Settings, open Accessibility settings and allow WheelDesk, the helper reconnects automatically. Migrating from 0.1.4 or earlier requires removing the old entry and adding /Applications/WheelDesk.app once. Later updates retain the same signing identity.
-2. Grant Screen Recording when using screenshots. Screen capture stays off until you choose a screenshot action.
-3. In Models, add a service, choose a provider, enter its key, then choose or type a model. Fetch models offers a searchable list. **Save and test connection** sends a short text request and securely saves a typed key only after success; failed tests preserve the previous key. API format/address are configured automatically and hidden under **Advanced settings** by default. Custom services expose the URL directly; local services usually need no key. Tests may incur a small API charge and do not verify image support.
-4. In Wheels, choose the spoke count, then drag original effects between positions, then choose each slot’s function in **Bind custom functions**. Swapping effects moves their functions with them; replacing an effect keeps the slot’s function. Click a palette tile to preview it without running its function. Empty function slots still play their selected effects without executing an action. Each position has a custom name, which overrides its function/effect name; leave it blank for automatic naming. Names follow slots when reordered and survive shrinking the wheel. Size, duration, volume and mute are configurable. Changes save automatically. Select a wheel preset to switch immediately, or switch from the tray.
-5. To test an action from settings, click Run and switch to the target application within the three-second countdown.
+- **1:1 League of Legends In-Game UI & Audio**: Authentic dark Hextech & aged-brass ESC Options frame, four SVG corner ornaments, square brass checkboxes, diamond-thumb sliders, offline SIL OFL 1.1 `Cinzel` & `Barlow Condensed` typography, and 10 loudness-calibrated `rcp-fe-lol-uikit` interaction sound effects synced with global volume and mute. See [UI Design Spec](docs/ui-design-spec.md).
+- **Original Ping Effects Decoupled from Functions**: Preserves hover glow/scale, expanding rings, pop/bobbing, All In collision, and original audio. Supports multiple wheels with 2–12 spokes and independent custom slot names.
+- **One-Click Wheel Preset Export / Import**: Share any wheel along with its referenced actions and workflows as a `.wheeldesk.json` bundle — **model profiles and API keys are never exported**. Imports remap colliding IDs safely without overwriting existing presets.
+- **Mouse-Native Default Actions**: Out-of-the-box region capture, screenshot Q&A, screenshot OCR, screenshot translation, ZH/EN translation, writing polish, key-point summary, code/concept explanation, plain-text paste, and folder opening — plus custom apps/paths, URLs, shortcuts, clipboard ops, and local scripts.
+- **Hextech Streamed Result Modal**: Non-focus-stealing streaming answers with **sanitized Markdown rendering**, **one-click code-block copy**, **in-card multi-turn follow-up questions**, and guarded fill-back to the original window.
+- **Custom AI Actions & Linear Workflows**: Works with OpenAI-compatible, Anthropic, and local (Ollama / LM Studio) endpoints. Describe an AI action once to cache an editable reusable instruction, or chain actions and macOS Shell / Windows PowerShell scripts (stdin-fed) into workflows.
+- **Local-First Privacy**: English and Simplified Chinese UI, OS-encrypted API keys (`secrets.enc`), zero accounts, telemetry, or cloud sync.
 
-A text action with no readable selection asks for input; it never silently sends the clipboard. Result cards do not activate the app while streaming. Fill-back requires the original window and selection; when they changed, copy the answer instead.
+---
 
-## Workflows
+## Install
 
-Create reusable actions first, then add ordered workflow steps. Choose each input explicitly: fixed content, selection, clipboard text, manual input, selected screenshot or previous result. Assign the workflow directly from the function list for a wheel slot. Test and edit its steps on the Workflows page.
+Download installers from [GitHub Releases](https://github.com/Alooshy0827/WheelDesk/releases):
 
-Scripts run as the current user. PowerShell execution policy is set only for the child process. No model-generated commands are executed automatically. Script working directories are temporary; use absolute paths for persistent files. A failed step stops the workflow. Cancellation stops the current script process group/tree; it does not undo steps already completed.
+### macOS 13+ (Apple Silicon)
+1. Open `WheelDesk-0.1.19-arm64.dmg` and drag `WheelDesk.app` into **Applications**.
+2. Builds use a persistent internal signing certificate (not notarized). If Gatekeeper blocks first launch, open **System Settings → Privacy & Security → Open Anyway**.
+3. Open WheelDesk → **Settings** and grant **Accessibility** (the input helper reconnects automatically). Grant **Screen Recording** only when using screenshot actions.
 
-## Build and test
+### Windows 11 (x64)
+1. Download and run `WheelDesk-Setup-0.1.19.exe`.
 
-Requires Node 22.12+ and Xcode Command Line Tools on Apple Silicon, or Visual Studio 2022 C++ build tools on Windows.
+---
+
+## Build & Test
+
+Requires Node 22.12+ and Xcode Command Line Tools (macOS) or Visual Studio 2022 C++ Build Tools (Windows).
 
 ```sh
 npm ci
@@ -55,20 +62,10 @@ npm run dist:mac
 npm run dist:win
 ```
 
-`tools/smoke.cjs` runs the real application against a local mock model and an isolated data folder. After `npm run build`, set `WHEELDESK_DATA_DIR` to a temporary absolute folder and run `npm run smoke`. See [validation](docs/validation.md) for completed checks and unverified OS behavior.
+`tools/smoke.cjs` tests the real Electron app against a local mock model and an isolated `WHEELDESK_DATA_DIR`. See [validation](docs/validation.md) for verified checks and platform limits, and [design](docs/wheeldesk.md#stable-macos-update-identity) for macOS signing identity details.
 
-GitHub Actions checks both native platforms on push. **Build internal installers** is manually dispatched and uploads private workflow artifacts; it does not publish releases.
+---
 
-## Data and privacy
+## Data & Privacy
 
-Settings are stored separately in `~/Library/Application Support/WheelDesk` or `%APPDATA%\WheelDesk`. API keys are encrypted with Electron safeStorage in `secrets.enc`, never included in ordinary settings. Results are kept in memory for the current run; screenshots and script files are removed after use. Only configured model endpoints receive AI requests. There is no backend account, telemetry, automatic update checker, room service, or cloud sync.
-
-The repository retains upstream source modules and regression tests to preserve compatibility of reused helpers/settings. Its only production main entry is `src/main/wheeldesk.ts`; rooms, agents and emote UI are not started. The original ping wheel and effects are part of WheelDesk. See [NOTICE](NOTICE.md) and [design](docs/wheeldesk.md).
-
-macOS packaging requires the original private signing identity. Hosted Actions deliberately fails macOS packaging until that identity is securely provisioned; never bypass this with ad-hoc signing. See [signing setup and backup](docs/wheeldesk.md#stable-macos-update-identity).
-
-Ordinary system actions run without a result popup. AI and scripts respect their output mode; workflows retain progress and cancellation. Input requests and failures still display the required dialog.
-
-### Custom AI actions
-
-Use **New custom AI action** under any wheel position to create and bind an action, or add one in the action library. Describe the task and select its input, model and output. Generate the understanding now, or let the first run prepare and save it. Unchanged descriptions reuse that instruction across restarts; processing new input still calls the model. Edit the saved understanding directly, or provide revision feedback and regenerate. Changing the description invalidates the old preparation. Cancelled or failed requests preserve the previous content. Built-in actions retain direct-prompt mode.
+Settings live in `~/Library/Application Support/WheelDesk` (macOS) or `%APPDATA%\WheelDesk` (Windows). API keys are encrypted via Electron `safeStorage` in `secrets.enc` and excluded from normal settings and preset exports. Only your configured model endpoints receive AI requests. See [NOTICE.md](NOTICE.md) and [design](docs/wheeldesk.md).
